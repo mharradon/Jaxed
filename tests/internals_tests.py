@@ -8,6 +8,8 @@ from jax import lax
 from absl.testing import absltest
 import jaxlib
 
+import jaxed
+
 from jax._src import test_util as jtu
 
 
