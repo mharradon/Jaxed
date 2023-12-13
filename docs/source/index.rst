@@ -2,8 +2,8 @@
    to your liking, but it should at least contain the root `toctree` 
    directive.
 
-Welcome to the Jaxed documentation!
-==================================
+Jaxed
+=====
 
 .. toctree::
    :maxdepth: 2
