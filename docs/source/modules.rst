@@ -1,8 +1,2 @@
-The py_pkg Package
+The Jaxed Package
 ==================
-
-.. automodule:: py_pkg.curves
-    :members:
-
-.. automodule:: py_pkg.entry_points
-    :members:
