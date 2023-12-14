@@ -6,7 +6,7 @@ Jaxed
 =====
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
 .. include:: include_readme.rst
 
