@@ -8,6 +8,6 @@ Jaxed
 .. toctree::
    :maxdepth: 2
 
-.. include:: readme.md
+.. include:: include_readme.rst
 
-.. include:: _autosummary/modules.rst
+.. include:: modules.rst

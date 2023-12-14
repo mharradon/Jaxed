@@ -41,7 +41,7 @@ jobs:
         run: python -m unittest
       - name: Build docs
         run: |
-          sphinx-apidoc jaxed -o docs/source/_autosummary && sphinx-build -b html docs/source docs/build_html
+          sphinx-apidoc -o docs/source jaxed && sphinx-build -b html docs/source docs/build_html
       - name: Deploy to pages
         uses: peaceiris/actions-gh-pages@v3
         with:
