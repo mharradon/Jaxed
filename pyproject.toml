@@ -27,6 +27,7 @@ dev = [
     "pytest",
     "ipython",
     "mypy",
+    "myst-parser",
     "sphinx",
     "sphinx-rtd-theme"
 ]
