@@ -12,14 +12,14 @@ classifiers=[
     'Intended Audience :: Developers',
     'Programming Language :: Python :: 3.9',
 ]
-
-[license]
-file = "LICENSE"
-
 dependencies = [
   "jax",
   "flax"
 ]
+
+[license]
+file = "LICENSE"
+
 
 [project.optional-dependencies]
 dev = [
