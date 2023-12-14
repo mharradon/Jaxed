@@ -6,7 +6,7 @@ from setuptools import setup
 # get key package details from __version__.py
 about = {}  # type: ignore
 here = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(here, '__version__.py')) as f:
+with open(os.path.join(here, 'jaxed', '__version__.py')) as f:
     exec(f.read(), about)
 
 # load the README file and use it as the long_description for PyPI
@@ -33,8 +33,10 @@ setup(
             "flake8",
             "pytest",
             "mypy",
+            "myst-parser",
             "sphinx",
-            "sphinx-rtd-theme"
+            "sphinx-rtd-theme",
+            "setuptools>=61.0"
         ]
     },
     license=about['__license__'],

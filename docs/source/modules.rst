@@ -1,2 +1,0 @@
-The Jaxed Package
-==================

@@ -8,6 +8,6 @@ Jaxed
 .. toctree::
    :maxdepth: 2
 
-   modules
+.. include:: readme.md
 
-* :ref:`genindex`
+.. include:: _autosummary/modules.rst
