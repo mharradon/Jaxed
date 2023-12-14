@@ -1,5 +1,5 @@
 # Simple workflow for deploying static content to GitHub Pages
-name: Documentation
+name: Deploy
 
 on:
   # Runs on pushes targeting the default branch
@@ -29,15 +29,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout 
         uses: actions/checkout@v4
-      - uses: actions/setup-python@v3
-      - name: Install dependencies
+      - name: Install Dependencies
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+      - run: pip install -e .[dev]
+      - name: Run Tests
+        run: python -m unittest
+      - name: Build docs
         run: |
-          pip install sphinx sphinx_rtd_theme myst_parser
-      - name: Sphinx build
-        run: |
-          sphinx-build -b html docs/source docs/build_html
+          sphinx-apidoc -o docs/source jaxed && sphinx-build -b html docs/source docs/build_html
       - name: Deploy to pages
         uses: peaceiris/actions-gh-pages@v3
         with:
