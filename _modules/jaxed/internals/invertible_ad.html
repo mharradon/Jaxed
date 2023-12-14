@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>jaxed.internals.invertible_ad &mdash; Jaxed 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Jaxed
+          </a>
+              <div class="version">
+                0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../jaxed.html">jaxed package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Jaxed</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">jaxed.internals.invertible_ad</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for jaxed.internals.invertible_ad</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright 2020 Google LLC</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     https://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">collections.abc</span> <span class="kn">import</span> <span class="n">Sequence</span>
+
+<span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">from</span> <span class="nn">jax</span> <span class="kn">import</span> <span class="n">core</span>
+<span class="kn">from</span> <span class="nn">jax.extend</span> <span class="kn">import</span> <span class="n">linear_util</span> <span class="k">as</span> <span class="n">lu</span>
+<span class="kn">from</span> <span class="nn">jax.interpreters</span> <span class="kn">import</span> <span class="n">ad</span>
+<span class="kn">from</span> <span class="nn">jax.interpreters</span> <span class="kn">import</span> <span class="n">partial_eval</span> <span class="k">as</span> <span class="n">pe</span>
+<span class="kn">from</span> <span class="nn">jax.core</span> <span class="kn">import</span> <span class="n">raise_to_shaped</span><span class="p">,</span> <span class="n">get_aval</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Jaxpr</span>
+<span class="kn">from</span> <span class="nn">jax._src.api_util</span> <span class="kn">import</span> <span class="n">flatten_fun_nokwargs</span>
+<span class="kn">from</span> <span class="nn">jax.tree_util</span> <span class="kn">import</span> <span class="n">tree_flatten</span><span class="p">,</span> <span class="n">tree_unflatten</span><span class="p">,</span> <span class="n">register_pytree_node</span>
+<span class="kn">from</span> <span class="nn">jax._src.util</span> <span class="kn">import</span> <span class="n">safe_map</span><span class="p">,</span> <span class="n">safe_zip</span><span class="p">,</span> <span class="n">split_list</span><span class="p">,</span> <span class="n">weakref_lru_cache</span>
+<span class="kn">from</span> <span class="nn">jax._src</span> <span class="kn">import</span> <span class="n">custom_derivatives</span>
+<span class="kn">from</span> <span class="nn">jax._src.config</span> <span class="kn">import</span> <span class="n">config</span>
+<span class="kn">from</span> <span class="nn">jax._src.pjit</span> <span class="kn">import</span> <span class="n">pjit_p</span>
+
+<span class="nb">map</span> <span class="o">=</span> <span class="n">safe_map</span>
+<span class="nb">zip</span> <span class="o">=</span> <span class="n">safe_zip</span>
+
+<span class="k">def</span> <span class="nf">_initial_style_jaxpr</span><span class="p">(</span><span class="n">fun</span><span class="p">,</span> <span class="n">in_avals</span><span class="p">):</span>
+  <span class="n">jaxpr</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">consts</span> <span class="o">=</span> <span class="n">pe</span><span class="o">.</span><span class="n">trace_to_jaxpr_dynamic</span><span class="p">(</span><span class="n">fun</span><span class="p">,</span> <span class="n">in_avals</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">core</span><span class="o">.</span><span class="n">ClosedJaxpr</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">,</span> <span class="n">consts</span><span class="p">)</span>
+
+<span class="c1">################################################################################</span>
+<span class="c1"># Reverse call primitive</span>
+<span class="c1">################################################################################</span>
+
+<div class="viewcode-block" id="DontFlatten">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.DontFlatten">[docs]</a>
+<span class="k">class</span> <span class="nc">DontFlatten</span><span class="p">:</span>
+  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">val</span> <span class="o">=</span> <span class="n">val</span></div>
+
+
+<span class="n">register_pytree_node</span><span class="p">(</span><span class="n">DontFlatten</span><span class="p">,</span>
+                     <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">((),</span> <span class="n">x</span><span class="o">.</span><span class="n">val</span><span class="p">),</span>
+                     <span class="k">lambda</span> <span class="n">val</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">DontFlatten</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
+
+<div class="viewcode-block" id="invertible">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.invertible">[docs]</a>
+<span class="k">def</span> <span class="nf">invertible</span><span class="p">(</span><span class="n">fun</span><span class="p">):</span>
+  <span class="c1"># TODO: Avoid materializing zeros!</span>
+  <span class="n">ifun</span> <span class="o">=</span> <span class="n">custom_derivatives</span><span class="o">.</span><span class="n">custom_vjp</span><span class="p">(</span><span class="n">fun</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">fwd</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="n">flat_args</span><span class="p">,</span> <span class="n">in_tree</span> <span class="o">=</span> <span class="n">tree_flatten</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="n">fun_flat</span><span class="p">,</span> <span class="n">out_tree</span> <span class="o">=</span> <span class="n">flatten_fun_nokwargs</span><span class="p">(</span><span class="n">lu</span><span class="o">.</span><span class="n">wrap_init</span><span class="p">(</span><span class="n">fun</span><span class="p">),</span> <span class="n">in_tree</span><span class="p">)</span>
+
+    <span class="c1">#in_pvals = tuple(pe.PartialVal.unknown(raise_to_shaped(get_aval(arg))) for arg in flat_args)</span>
+    <span class="c1">#jaxpr, out_pvals, consts = pe.trace_to_jaxpr_nounits(fun_flat, in_pvals)</span>
+
+    <span class="n">in_avals</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">get_aval</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">flat_args</span><span class="p">)</span>
+    <span class="n">jaxpr</span><span class="p">,</span> <span class="n">out_avals</span><span class="p">,</span> <span class="n">consts</span> <span class="o">=</span> <span class="n">pe</span><span class="o">.</span><span class="n">trace_to_jaxpr_dynamic</span><span class="p">(</span><span class="n">fun_flat</span><span class="p">,</span> <span class="n">in_avals</span><span class="p">)</span>
+    <span class="c1"># TODO: Don&#39;t warn if consts contain JVP tracers?</span>
+    <span class="k">if</span> <span class="n">consts</span><span class="p">:</span>
+      <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Values that an @invertible function closes over will not have their &quot;</span> <span class="o">+</span>
+                    <span class="s2">&quot;gradients computed correctly (their uses inside this function will be ignored)!&quot;</span><span class="p">)</span>
+    <span class="c1"># TODO: This requires the body to be jittable, but this shouldn&#39;t be necessary.</span>
+    <span class="c1">#       Is there a way to trace a jaxpr while running it?</span>
+    <span class="n">flat_outs</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">eval_jaxpr</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">,</span> <span class="n">consts</span><span class="p">,</span> <span class="o">*</span><span class="n">flat_args</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">tree_unflatten</span><span class="p">(</span><span class="n">out_tree</span><span class="p">(),</span> <span class="n">flat_outs</span><span class="p">),</span> <span class="p">(</span><span class="n">flat_args</span><span class="p">,</span> <span class="n">flat_outs</span><span class="p">,</span> <span class="n">consts</span><span class="p">,</span> <span class="n">DontFlatten</span><span class="p">((</span><span class="n">jaxpr</span><span class="p">,</span> <span class="n">in_tree</span><span class="p">)))</span>
+
+  <span class="k">def</span> <span class="nf">bwd</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">cts</span><span class="p">):</span>
+    <span class="n">flat_args</span><span class="p">,</span> <span class="n">flat_outs</span><span class="p">,</span> <span class="n">consts</span><span class="p">,</span> <span class="n">aux</span> <span class="o">=</span> <span class="n">res</span>
+    <span class="n">jaxpr</span><span class="p">,</span> <span class="n">in_tree</span> <span class="o">=</span> <span class="n">aux</span><span class="o">.</span><span class="n">val</span>
+    <span class="n">flat_cts</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">tree_flatten</span><span class="p">(</span><span class="n">cts</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">tree_unflatten</span><span class="p">(</span><span class="n">in_tree</span><span class="p">,</span> <span class="n">inv_backward_pass</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">,</span> <span class="n">consts</span><span class="p">,</span> <span class="n">flat_args</span><span class="p">,</span> <span class="n">flat_outs</span><span class="p">,</span> <span class="n">flat_cts</span><span class="p">))</span>
+
+  <span class="n">ifun</span><span class="o">.</span><span class="n">defvjp</span><span class="p">(</span><span class="n">fwd</span><span class="p">,</span> <span class="n">bwd</span><span class="p">)</span>
+
+  <span class="k">return</span> <span class="n">ifun</span></div>
+
+
+<span class="c1">################################################################################</span>
+<span class="c1"># Custom inverse</span>
+<span class="c1">################################################################################</span>
+
+<div class="viewcode-block" id="custom_ivjp">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.custom_ivjp">[docs]</a>
+<span class="k">class</span> <span class="nc">custom_ivjp</span><span class="p">:</span>
+  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fun</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">fun</span> <span class="o">=</span> <span class="n">fun</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">ivjp</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="custom_ivjp.defivjp">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.custom_ivjp.defivjp">[docs]</a>
+  <span class="k">def</span> <span class="nf">defivjp</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ivjp</span><span class="p">):</span>
+    <span class="c1"># ivjp(inputs, outputs, output_cotangents) -&gt; (inputs, input_cotangents)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">ivjp</span> <span class="o">=</span> <span class="n">ivjp</span></div>
+
+
+  <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ivjp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+      <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;No IVJP defined for custom_vjp function </span><span class="si">{}</span><span class="s2">. Did you forget to use defivjp?&quot;</span>
+      <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">custom_derivatives</span><span class="o">.</span><span class="n">_resolve_kwargs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fun</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+    <span class="c1"># TODO: Support nondiff_argnums</span>
+    <span class="n">fun</span><span class="p">,</span> <span class="n">ivjp</span> <span class="o">=</span> <span class="n">lu</span><span class="o">.</span><span class="n">wrap_init</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fun</span><span class="p">),</span> <span class="n">lu</span><span class="o">.</span><span class="n">wrap_init</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ivjp</span><span class="p">)</span>
+    <span class="n">args_flat</span><span class="p">,</span> <span class="n">in_tree</span> <span class="o">=</span> <span class="n">tree_flatten</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">flat_fun</span><span class="p">,</span> <span class="n">out_tree</span> <span class="o">=</span> <span class="n">flatten_fun_nokwargs</span><span class="p">(</span><span class="n">fun</span><span class="p">,</span> <span class="n">in_tree</span><span class="p">)</span>
+    <span class="n">flat_ivjp</span> <span class="o">=</span> <span class="n">_flatten_ivjp</span><span class="p">(</span><span class="n">ivjp</span><span class="p">,</span> <span class="n">in_tree</span><span class="p">,</span> <span class="n">out_tree</span><span class="p">)</span>
+    <span class="n">out_flat</span> <span class="o">=</span> <span class="n">_custom_ivjp</span><span class="p">(</span><span class="n">flat_fun</span><span class="p">,</span> <span class="n">flat_ivjp</span><span class="p">,</span> <span class="n">args_flat</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">tree_unflatten</span><span class="p">(</span><span class="n">out_tree</span><span class="p">(),</span> <span class="n">out_flat</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="zip_with">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.zip_with">[docs]</a>
+<span class="k">def</span> <span class="nf">zip_with</span><span class="p">(</span><span class="n">fun</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+  <span class="k">return</span> <span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">fun</span><span class="p">(</span><span class="o">*</span><span class="n">p</span><span class="p">),</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">))</span></div>
+
+
+<span class="nd">@lu</span><span class="o">.</span><span class="n">transformation</span>
+<span class="k">def</span> <span class="nf">_flatten_ivjp</span><span class="p">(</span><span class="n">in_tree</span><span class="p">,</span> <span class="n">out_tree</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+  <span class="n">out_tree</span> <span class="o">=</span> <span class="n">out_tree</span><span class="p">()</span>
+  <span class="n">num_inputs</span><span class="p">,</span> <span class="n">num_outputs</span> <span class="o">=</span> <span class="n">in_tree</span><span class="o">.</span><span class="n">num_leaves</span><span class="p">,</span> <span class="n">out_tree</span><span class="o">.</span><span class="n">num_leaves</span>
+  <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="n">num_inputs</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">num_outputs</span>
+  <span class="n">arg_leaves</span> <span class="o">=</span> <span class="n">split_list</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="p">[</span><span class="n">num_inputs</span><span class="p">,</span> <span class="n">num_outputs</span><span class="p">])</span>
+  <span class="n">py_args</span> <span class="o">=</span> <span class="n">zip_with</span><span class="p">(</span><span class="n">tree_unflatten</span><span class="p">,</span> <span class="p">[</span><span class="n">in_tree</span><span class="p">,</span> <span class="n">out_tree</span><span class="p">,</span> <span class="n">out_tree</span><span class="p">],</span> <span class="n">arg_leaves</span><span class="p">)</span>
+  <span class="n">pair_out</span> <span class="o">=</span> <span class="k">yield</span> <span class="n">py_args</span><span class="p">,</span> <span class="p">{}</span>
+  <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pair_out</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">pair_out</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Expected a two element pair as output of custom ivjp&quot;</span><span class="p">)</span>
+  <span class="k">yield</span> <span class="n">tree_flatten</span><span class="p">(</span><span class="n">pair_out</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">_custom_ivjp</span><span class="p">(</span><span class="n">fun</span><span class="p">,</span> <span class="n">ivjp</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+  <span class="n">in_avals</span> <span class="o">=</span> <span class="p">[</span><span class="n">raise_to_shaped</span><span class="p">(</span><span class="n">get_aval</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+  <span class="n">fun_jaxpr</span> <span class="o">=</span> <span class="n">_initial_style_jaxpr</span><span class="p">(</span><span class="n">fun</span><span class="p">,</span> <span class="n">in_avals</span><span class="p">)</span>
+  <span class="k">try</span><span class="p">:</span>
+    <span class="n">ivjp_jaxpr</span> <span class="o">=</span> <span class="n">_initial_style_jaxpr</span><span class="p">(</span><span class="n">ivjp</span><span class="p">,</span> <span class="n">in_avals</span> <span class="o">+</span> <span class="n">fun_jaxpr</span><span class="o">.</span><span class="n">out_avals</span> <span class="o">*</span> <span class="mi">2</span><span class="p">)</span>
+  <span class="k">except</span> <span class="ne">RecursionError</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Calls to </span><span class="si">{}</span><span class="s2"> from its custom ivjp aren&#39;t supported yet&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fun</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+  <span class="k">return</span> <span class="n">custom_ivjp_p</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">fun_jaxpr</span><span class="o">=</span><span class="n">fun_jaxpr</span><span class="p">,</span>
+                                   <span class="n">ivjp_jaxpr</span><span class="o">=</span><span class="n">ivjp_jaxpr</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">_custom_ivjp_impl</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">fun_jaxpr</span><span class="p">,</span> <span class="o">**</span><span class="n">_</span><span class="p">):</span>
+  <span class="k">return</span> <span class="n">core</span><span class="o">.</span><span class="n">jaxpr_as_fun</span><span class="p">(</span><span class="n">fun_jaxpr</span><span class="p">)(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+
+<span class="n">custom_ivjp_p</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">Primitive</span><span class="p">(</span><span class="s1">&#39;custom_ivjp&#39;</span><span class="p">)</span>
+<span class="n">custom_ivjp_p</span><span class="o">.</span><span class="n">multiple_results</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">custom_ivjp_p</span><span class="o">.</span><span class="n">def_impl</span><span class="p">(</span><span class="n">_custom_ivjp_impl</span><span class="p">)</span>
+<span class="n">custom_ivjp_p</span><span class="o">.</span><span class="n">def_abstract_eval</span><span class="p">(</span><span class="k">lambda</span> <span class="o">*</span><span class="n">_</span><span class="p">,</span> <span class="n">fun_jaxpr</span><span class="p">,</span> <span class="o">**</span><span class="n">__</span><span class="p">:</span> <span class="n">fun_jaxpr</span><span class="o">.</span><span class="n">out_avals</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">_custom_ivjp_jvp</span><span class="p">(</span><span class="n">primals</span><span class="p">,</span> <span class="n">tangents</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">fun_jaxpr</span><span class="p">,</span> <span class="n">ivjp_jaxpr</span><span class="p">):</span>
+  <span class="n">primals_out</span> <span class="o">=</span> <span class="n">custom_ivjp_p</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="o">*</span><span class="n">primals</span><span class="p">,</span> <span class="n">fun_jaxpr</span><span class="o">=</span><span class="n">fun_jaxpr</span><span class="p">,</span>
+                                             <span class="n">ivjp_jaxpr</span><span class="o">=</span><span class="n">ivjp_jaxpr</span><span class="p">)</span>
+  <span class="n">fun</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">jaxpr_as_fun</span><span class="p">(</span><span class="n">fun_jaxpr</span><span class="p">)</span>
+  <span class="c1"># FIXME: This might compute the primals multiple times, but we only need to do</span>
+  <span class="c1">#        this trick while linearizing. It should be possible to do it through</span>
+  <span class="c1">#        a custom partial eval rule.</span>
+  <span class="n">_</span><span class="p">,</span> <span class="n">tangents_out</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">jvp</span><span class="p">(</span><span class="n">lu</span><span class="o">.</span><span class="n">wrap_init</span><span class="p">(</span><span class="n">fun</span><span class="p">))</span><span class="o">.</span><span class="n">call_wrapped</span><span class="p">(</span><span class="n">primals</span><span class="p">,</span> <span class="n">tangents</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">primals_out</span><span class="p">,</span> <span class="n">tangents_out</span>
+<span class="n">ad</span><span class="o">.</span><span class="n">primitive_jvps</span><span class="p">[</span><span class="n">custom_ivjp_p</span><span class="p">]</span> <span class="o">=</span> <span class="n">_custom_ivjp_jvp</span>
+
+<span class="c1">################################################################################</span>
+<span class="c1"># Backward pass implementation</span>
+<span class="c1">################################################################################</span>
+
+<div class="viewcode-block" id="inv_backward_pass">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.inv_backward_pass">[docs]</a>
+<span class="k">def</span> <span class="nf">inv_backward_pass</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">:</span> <span class="n">core</span><span class="o">.</span><span class="n">Jaxpr</span><span class="p">,</span> <span class="n">consts</span><span class="p">,</span> <span class="n">primals_in</span><span class="p">,</span> <span class="n">primals_out</span><span class="p">,</span> <span class="n">cotangents_in</span><span class="p">):</span>
+  <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">ct</span><span class="p">)</span> <span class="ow">is</span> <span class="n">ad</span><span class="o">.</span><span class="n">Zero</span> <span class="k">for</span> <span class="n">ct</span> <span class="ow">in</span> <span class="n">cotangents_in</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">ad</span><span class="o">.</span><span class="n">Zero</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">aval</span><span class="p">),</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">invars</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">write_cotangent</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">ct</span><span class="p">):</span>
+    <span class="c1"># assert v not in primal_env</span>
+    <span class="k">if</span> <span class="n">ct</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Literal</span><span class="p">:</span>
+      <span class="n">ct_env</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">add_tangents</span><span class="p">(</span><span class="n">ct_env</span><span class="p">[</span><span class="n">v</span><span class="p">],</span> <span class="n">ct</span><span class="p">)</span> <span class="k">if</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">ct_env</span> <span class="k">else</span> <span class="n">ct</span>
+
+  <span class="k">def</span> <span class="nf">read_cotangent</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">ct_env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">ad</span><span class="o">.</span><span class="n">Zero</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">aval</span><span class="p">))</span>
+
+  <span class="k">def</span> <span class="nf">read_primal</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="ow">is</span> <span class="n">Literal</span><span class="p">:</span>
+      <span class="k">return</span> <span class="n">v</span><span class="o">.</span><span class="n">val</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="k">return</span> <span class="n">primal_env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">ad</span><span class="o">.</span><span class="n">UndefinedPrimal</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">aval</span><span class="p">))</span>
+
+  <span class="k">def</span> <span class="nf">write_primal</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="ow">is</span> <span class="n">Literal</span><span class="p">:</span>
+      <span class="k">return</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ad</span><span class="o">.</span><span class="n">is_undefined_primal</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+      <span class="n">primal_env</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>
+
+  <span class="c1"># Invert while computing cotangents</span>
+  <span class="n">ct_env</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+  <span class="n">primal_env</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+  <span class="c1">#write_primal(core.unitvar, core.unit)</span>
+  <span class="nb">map</span><span class="p">(</span><span class="n">write_primal</span><span class="p">,</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">invars</span><span class="p">,</span> <span class="n">primals_in</span><span class="p">)</span>
+  <span class="nb">map</span><span class="p">(</span><span class="n">write_primal</span><span class="p">,</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">outvars</span><span class="p">,</span> <span class="n">primals_out</span><span class="p">)</span>
+  <span class="nb">map</span><span class="p">(</span><span class="n">write_primal</span><span class="p">,</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">constvars</span><span class="p">,</span> <span class="n">consts</span><span class="p">)</span>
+  <span class="nb">map</span><span class="p">(</span><span class="n">write_cotangent</span><span class="p">,</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">outvars</span><span class="p">,</span> <span class="n">cotangents_in</span><span class="p">)</span>
+  <span class="k">for</span> <span class="n">eqn</span> <span class="ow">in</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">eqns</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+    <span class="n">primals_in</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">read_primal</span><span class="p">,</span> <span class="n">eqn</span><span class="o">.</span><span class="n">invars</span><span class="p">)</span>
+    <span class="n">primals_out</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">read_primal</span><span class="p">,</span> <span class="n">eqn</span><span class="o">.</span><span class="n">outvars</span><span class="p">)</span>
+    <span class="n">cts_in</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">read_cotangent</span><span class="p">,</span> <span class="n">eqn</span><span class="o">.</span><span class="n">outvars</span><span class="p">)</span>
+    <span class="n">should_invert</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">primal</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">ad</span><span class="o">.</span><span class="n">UndefinedPrimal</span>
+                        <span class="k">for</span> <span class="n">primal</span> <span class="ow">in</span> <span class="n">primals_out</span><span class="p">)</span>
+    <span class="n">should_vjp</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">ct</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">ad</span><span class="o">.</span><span class="n">Zero</span> <span class="k">for</span> <span class="n">ct</span> <span class="ow">in</span> <span class="n">cts_in</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="ow">not</span> <span class="n">eqn</span><span class="o">.</span><span class="n">primitive</span><span class="o">.</span><span class="n">call_primitive</span>
+
+    <span class="c1"># Skip primals equations that are only jvp coefficients and don&#39;t affect</span>
+    <span class="c1"># primal outputs.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">should_invert</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">should_vjp</span><span class="p">:</span>
+      <span class="k">continue</span>
+
+    <span class="k">def</span> <span class="nf">abstract</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+      <span class="k">return</span> <span class="n">raise_to_shaped</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">aval</span> <span class="k">if</span> <span class="n">ad</span><span class="o">.</span><span class="n">is_undefined_primal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">else</span> <span class="n">get_aval</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+
+    <span class="c1"># Get the ivjp_jaxpr</span>
+    <span class="k">if</span> <span class="n">eqn</span><span class="o">.</span><span class="n">primitive</span> <span class="ow">is</span> <span class="n">custom_ivjp_p</span><span class="p">:</span>
+      <span class="n">ivjp_jaxpr</span> <span class="o">=</span> <span class="n">eqn</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;ivjp_jaxpr&#39;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="k">if</span> <span class="n">eqn</span><span class="o">.</span><span class="n">primitive</span> <span class="ow">in</span> <span class="n">primitive_ivjps</span><span class="p">:</span>
+        <span class="n">complete_ivjp</span> <span class="o">=</span> <span class="n">lu</span><span class="o">.</span><span class="n">wrap_init</span><span class="p">(</span><span class="n">primitive_ivjps</span><span class="p">[</span><span class="n">eqn</span><span class="o">.</span><span class="n">primitive</span><span class="p">])</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">complete_ivjp</span> <span class="o">=</span> <span class="n">lu</span><span class="o">.</span><span class="n">wrap_init</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">synthesize_ivjp</span><span class="p">,</span> <span class="n">eqn</span><span class="p">,</span> <span class="nb">map</span><span class="p">(</span><span class="n">ad</span><span class="o">.</span><span class="n">is_undefined_primal</span><span class="p">,</span> <span class="n">primals_in</span><span class="p">)))</span>
+      <span class="n">_</span><span class="p">,</span> <span class="n">in_tree</span> <span class="o">=</span> <span class="n">tree_flatten</span><span class="p">(</span>
+          <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">abstract</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">(</span><span class="n">primals_in</span><span class="p">,</span> <span class="n">primals_out</span><span class="p">,</span> <span class="n">cts_in</span><span class="p">)))</span>
+      <span class="n">complete_ivjp_flat</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">flatten_fun_nokwargs</span><span class="p">(</span><span class="n">complete_ivjp</span><span class="p">,</span> <span class="n">in_tree</span><span class="p">)</span>
+
+      <span class="n">in_avals</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">abstract</span><span class="p">,</span> <span class="n">primals_in</span> <span class="o">+</span> <span class="n">primals_out</span> <span class="o">+</span> <span class="n">primals_out</span><span class="p">)</span>
+      <span class="c1"># TODO: Actually we do know some of the inputs, because they might be literals!</span>
+      <span class="n">ivjp_jaxpr</span><span class="p">,</span> <span class="n">out_pvals</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">pe</span><span class="o">.</span><span class="n">trace_to_jaxpr_nounits</span><span class="p">(</span>
+          <span class="n">complete_ivjp_flat</span><span class="p">,</span> <span class="nb">map</span><span class="p">(</span><span class="n">pe</span><span class="o">.</span><span class="n">PartialVal</span><span class="o">.</span><span class="n">unknown</span><span class="p">,</span> <span class="n">in_avals</span><span class="p">),</span> <span class="n">instantiate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+      <span class="c1">#ivjp_jaxpr, out_pvals, _ = pe.trace_to_jaxpr_dynamic(</span>
+      <span class="c1">#    complete_ivjp_flat, in_avals)</span>
+      <span class="k">assert</span> <span class="ow">not</span> <span class="n">ivjp_jaxpr</span><span class="o">.</span><span class="n">constvars</span>  <span class="c1"># That might happen some time, but don&#39;t bother until then</span>
+      <span class="n">ivjp_jaxpr</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">ClosedJaxpr</span><span class="p">(</span><span class="n">ivjp_jaxpr</span><span class="p">,</span> <span class="p">[])</span>
+
+    <span class="c1"># Once we know what the ivjp can do exactly, we have to isolate the part we are</span>
+    <span class="c1"># actually able to compute with the values we have at hand.</span>
+    <span class="n">num_inputs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">eqn</span><span class="o">.</span><span class="n">invars</span><span class="p">)</span>
+    <span class="n">unknowns</span> <span class="o">=</span> <span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">ad</span><span class="o">.</span><span class="n">is_undefined_primal</span><span class="p">,</span> <span class="n">primals_in</span><span class="p">)</span> <span class="o">+</span>
+                <span class="nb">map</span><span class="p">(</span><span class="n">ad</span><span class="o">.</span><span class="n">is_undefined_primal</span><span class="p">,</span> <span class="n">primals_out</span><span class="p">)</span> <span class="o">+</span>
+                <span class="p">[</span><span class="kc">False</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">cts_in</span><span class="p">))</span>
+    <span class="n">jaxpr_known</span><span class="p">,</span> <span class="n">jaxpr_unknown</span><span class="p">,</span> <span class="n">out_unknowns</span><span class="p">,</span> <span class="n">res_avals</span> <span class="o">=</span> <span class="n">pe</span><span class="o">.</span><span class="n">partial_eval_jaxpr_nounits</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
+        <span class="n">ivjp_jaxpr</span><span class="p">,</span> <span class="n">unknowns</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># type:ignore</span>
+    <span class="n">unknown_rec_primals_in</span><span class="p">,</span> <span class="n">unknown_cotangents</span> <span class="o">=</span> <span class="n">split_list</span><span class="p">(</span><span class="n">out_unknowns</span><span class="p">,</span> <span class="p">[</span><span class="n">num_inputs</span><span class="p">])</span>
+    <span class="n">recon_primals</span> <span class="o">=</span> <span class="p">[</span><span class="ow">not</span> <span class="n">cant_recon</span> <span class="k">for</span> <span class="n">cant_recon</span> <span class="ow">in</span> <span class="n">unknown_rec_primals_in</span><span class="p">]</span>
+    <span class="c1"># Make sure we&#39;re able to compute all cotangents. We don&#39;t really care if we</span>
+    <span class="c1"># can reconstruct primals or not, although failure to do so might result in</span>
+    <span class="c1"># failing to compute cotangents later.</span>
+    <span class="k">assert</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">unknown_cotangents</span><span class="p">)</span>
+
+    <span class="c1"># Remove residual outputs -- we won&#39;t be computing the unknown jaxpr anyway.</span>
+    <span class="n">non_residual_index_end</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">jaxpr_known</span><span class="o">.</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">outvars</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">res_avals</span><span class="p">)</span> <span class="c1"># Watch out for 0 edge case</span>
+    <span class="n">jaxpr_known</span><span class="o">.</span><span class="n">_jaxpr</span><span class="o">.</span><span class="n">_outvars</span> <span class="o">=</span> <span class="n">jaxpr_known</span><span class="o">.</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">outvars</span><span class="p">[:</span><span class="n">non_residual_index_end</span><span class="p">]</span>
+
+    <span class="c1"># TODO: We could drop the outputs that correspond to primals that we already know.</span>
+    <span class="c1">#       This only matters in eager mode, so leaving it out for now...</span>
+    <span class="n">ivjp</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">jaxpr_as_fun</span><span class="p">(</span><span class="n">jaxpr_known</span><span class="p">)</span>
+    <span class="n">known_primals_in</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">primal</span> <span class="k">for</span> <span class="n">primal</span> <span class="ow">in</span> <span class="n">primals_in</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">ad</span><span class="o">.</span><span class="n">is_undefined_primal</span><span class="p">(</span><span class="n">primal</span><span class="p">))</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">known_primals_in</span><span class="p">,</span> <span class="o">*</span><span class="n">primals_out</span><span class="p">,</span> <span class="o">*</span><span class="n">cts_in</span><span class="p">)</span>
+
+    <span class="n">ivjp_result</span> <span class="o">=</span> <span class="n">ivjp</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">rec_primals_in</span><span class="p">,</span> <span class="n">cts_out</span> <span class="o">=</span> <span class="n">split_list</span><span class="p">(</span><span class="n">ivjp_result</span><span class="p">,</span>
+                                         <span class="p">[</span><span class="nb">sum</span><span class="p">(</span><span class="n">recon_primals</span><span class="p">)])</span>
+
+    <span class="n">known_primals_in</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">known_primals_in</span><span class="p">)</span>
+    <span class="n">rec_primals_in</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">rec_primals_in</span><span class="p">)</span>
+    <span class="n">final_rec_primals_in</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">primal_reconned</span> <span class="ow">in</span> <span class="n">recon_primals</span><span class="p">:</span>
+      <span class="k">if</span> <span class="n">primal_reconned</span><span class="p">:</span>
+        <span class="n">final_rec_primals_in</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">rec_primals_in</span><span class="p">))</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">final_rec_primals_in</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">known_primals_in</span><span class="p">))</span>
+
+    <span class="nb">map</span><span class="p">(</span><span class="n">write_primal</span><span class="p">,</span> <span class="n">eqn</span><span class="o">.</span><span class="n">invars</span><span class="p">,</span> <span class="n">final_rec_primals_in</span><span class="p">)</span>
+    <span class="nb">map</span><span class="p">(</span><span class="n">write_cotangent</span><span class="p">,</span> <span class="p">[</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">eqn</span><span class="o">.</span><span class="n">invars</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Literal</span><span class="p">],</span> <span class="n">cts_out</span><span class="p">)</span>
+
+  <span class="c1"># NOTE: We keep the cotangents associated with primal variables, while the contract of a</span>
+  <span class="c1">#       transpose is to return them in positions associated with tangent variables, which</span>
+  <span class="c1">#       is what causes this whole confusion.</span>
+  <span class="k">return</span> <span class="nb">map</span><span class="p">(</span><span class="n">read_cotangent</span><span class="p">,</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">invars</span><span class="p">)</span></div>
+
+
+<span class="n">primitive_ivjps</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">core</span><span class="o">.</span><span class="n">Primitive</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="c1"># primitive_ivjps(inp_primal, out_primal, cts_out): [inp_primal, cts_in] </span>
+
+<div class="viewcode-block" id="synthesize_ivjp">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.synthesize_ivjp">[docs]</a>
+<span class="k">def</span> <span class="nf">synthesize_ivjp</span><span class="p">(</span><span class="n">eqn</span><span class="p">,</span> <span class="n">unknown_primals</span><span class="p">,</span> <span class="n">primals_in</span><span class="p">,</span> <span class="n">primals_out</span><span class="p">,</span> <span class="n">cts_in</span><span class="p">):</span>
+  <span class="c1"># Invert eqn</span>
+  <span class="k">if</span> <span class="ow">not</span> <span class="n">eqn</span><span class="o">.</span><span class="n">primitive</span><span class="o">.</span><span class="n">multiple_results</span><span class="p">:</span>
+    <span class="n">primals_out</span><span class="p">,</span> <span class="o">=</span> <span class="n">primals_out</span>
+  <span class="n">rec_primals_in</span> <span class="o">=</span> <span class="n">get_primitive_inverse</span><span class="p">(</span><span class="n">eqn</span><span class="o">.</span><span class="n">primitive</span><span class="p">)(</span><span class="n">primals_out</span><span class="p">,</span> <span class="o">*</span><span class="n">primals_in</span><span class="p">)</span>
+  <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">eqn</span><span class="o">.</span><span class="n">invars</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+    <span class="n">rec_primals_in</span> <span class="o">=</span> <span class="p">(</span><span class="n">rec_primals_in</span><span class="p">,)</span>
+
+  <span class="c1"># Use the reconstructed primals if some primals_in were unknown, because we</span>
+  <span class="c1"># might have reconstructed some of them.</span>
+  <span class="n">primals_in_sub_rec</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">,</span> <span class="n">rp</span><span class="p">,</span> <span class="n">unknown</span><span class="p">:</span> <span class="n">rp</span> <span class="k">if</span> <span class="n">unknown</span> <span class="k">else</span> <span class="n">p</span><span class="p">,</span>
+                           <span class="n">primals_in</span><span class="p">,</span> <span class="n">rec_primals_in</span><span class="p">,</span> <span class="n">unknown_primals</span><span class="p">)</span>
+
+  <span class="c1"># Compute the VJP of eqn</span>
+  <span class="n">variable_invars</span> <span class="o">=</span> <span class="p">[</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">eqn</span><span class="o">.</span><span class="n">invars</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Literal</span><span class="p">]</span>
+  <span class="n">variable_primals_in</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">primals_in_sub_rec</span><span class="p">,</span> <span class="n">eqn</span><span class="o">.</span><span class="n">invars</span><span class="p">)</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Literal</span><span class="p">]</span>
+  <span class="n">eqn_jaxpr</span> <span class="o">=</span> <span class="n">Jaxpr</span><span class="p">([],</span> <span class="n">variable_invars</span><span class="p">,</span> <span class="n">eqn</span><span class="o">.</span><span class="n">outvars</span><span class="p">,</span> <span class="p">[</span><span class="n">eqn</span><span class="p">])</span>
+  <span class="n">eqn_callable</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">args</span><span class="p">:</span> <span class="n">core</span><span class="o">.</span><span class="n">eval_jaxpr</span><span class="p">(</span><span class="n">eqn_jaxpr</span><span class="p">,</span> <span class="p">(),</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+  <span class="n">_</span><span class="p">,</span> <span class="n">eqn_vjp</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vjp</span><span class="p">(</span><span class="n">eqn_callable</span><span class="p">,</span> <span class="n">variable_primals_in</span><span class="p">)</span>
+  <span class="c1"># TODO: Instantiate zeros or (better) figure out how to avoid it!</span>
+  <span class="n">cts_out</span><span class="p">,</span> <span class="o">=</span> <span class="n">eqn_vjp</span><span class="p">(</span><span class="n">cts_in</span><span class="p">)</span>
+
+
+  <span class="k">return</span> <span class="n">rec_primals_in</span><span class="p">,</span> <span class="n">cts_out</span></div>
+
+
+<div class="viewcode-block" id="split">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.split">[docs]</a>
+<span class="k">def</span> <span class="nf">split</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">parts</span><span class="p">):</span>
+  <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">%</span> <span class="n">parts</span> <span class="o">==</span> <span class="mi">0</span>
+  <span class="n">chunk</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">//</span> <span class="n">parts</span>
+  <span class="k">return</span> <span class="p">[</span><span class="n">l</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span> <span class="o">+</span> <span class="n">chunk</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">),</span> <span class="n">chunk</span><span class="p">)]</span></div>
+
+
+<span class="c1">################################################################################</span>
+<span class="c1"># Primitive inverses</span>
+<span class="c1">################################################################################</span>
+
+<span class="n">primitive_inverses</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">core</span><span class="o">.</span><span class="n">Primitive</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="get_primitive_inverse">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.get_primitive_inverse">[docs]</a>
+<span class="k">def</span> <span class="nf">get_primitive_inverse</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+  <span class="k">try</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">primitive_inverses</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+  <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+    <span class="k">pass</span>
+  <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+    <span class="s2">&quot;Inverse rule for &#39;</span><span class="si">{}</span><span class="s2">&#39; not implemented&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">p</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="definverse">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.definverse">[docs]</a>
+<span class="k">def</span> <span class="nf">definverse</span><span class="p">(</span><span class="n">primitive</span><span class="p">,</span> <span class="n">inverse_rule</span><span class="p">):</span>
+  <span class="n">primitive_inverses</span><span class="p">[</span><span class="n">primitive</span><span class="p">]</span> <span class="o">=</span> <span class="n">inverse_rule</span>
+  <span class="k">return</span> <span class="n">inverse_rule</span></div>
+
+
+<span class="n">jax</span><span class="o">.</span><span class="n">custom_ivjp</span> <span class="o">=</span> <span class="n">custom_ivjp</span>
+
+<span class="c1">################################################################################</span>
+<span class="c1"># PJIT Stuff</span>
+<span class="c1">################################################################################</span>
+<div class="viewcode-block" id="ivjp_jaxpr">
+<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.ivjp_jaxpr">[docs]</a>
+<span class="k">def</span> <span class="nf">ivjp_jaxpr</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">:</span> <span class="n">core</span><span class="o">.</span><span class="n">ClosedJaxpr</span><span class="p">,</span> <span class="n">nonzeros</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+               <span class="n">instantiate</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">bool</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">core</span><span class="o">.</span><span class="n">ClosedJaxpr</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">bool</span><span class="p">]]:</span>
+  <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">instantiate</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="n">instantiate</span> <span class="o">=</span> <span class="p">(</span><span class="n">instantiate</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">out_avals</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">_ivjp_jaxpr</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">nonzeros</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">instantiate</span><span class="p">))</span></div>
+
+
+<span class="nd">@weakref_lru_cache</span>
+<span class="k">def</span> <span class="nf">_ivjp_jaxpr</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">,</span> <span class="n">nonzeros</span><span class="p">,</span> <span class="n">instantiate</span><span class="p">):</span>
+  <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">in_avals</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">nonzeros</span><span class="p">)</span>
+  <span class="n">f</span> <span class="o">=</span> <span class="n">lu</span><span class="o">.</span><span class="n">wrap_init</span><span class="p">(</span><span class="n">core</span><span class="o">.</span><span class="n">jaxpr_as_fun</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">))</span>
+  <span class="n">f_ivjp</span><span class="p">,</span> <span class="n">out_nonzeros</span> <span class="o">=</span> <span class="n">f_ivjp_traceable</span><span class="p">(</span><span class="n">ivjp</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="n">instantiate</span><span class="p">,</span> <span class="n">transform_stack</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                                          <span class="n">nonzeros</span><span class="p">)</span>
+  <span class="n">tangent_avals</span> <span class="o">=</span> <span class="p">[</span><span class="n">aval</span> <span class="k">for</span> <span class="n">aval</span><span class="p">,</span> <span class="n">nz</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">in_avals</span><span class="p">,</span> <span class="n">nonzeros</span><span class="p">)</span> <span class="k">if</span> <span class="n">nz</span><span class="p">]</span>
+  <span class="n">avals_in</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">it</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">in_avals</span><span class="p">,</span> <span class="n">tangent_avals</span><span class="p">))</span>
+  <span class="n">jaxpr_out</span><span class="p">,</span> <span class="n">avals_out</span><span class="p">,</span> <span class="n">literals_out</span> <span class="o">=</span> <span class="n">pe</span><span class="o">.</span><span class="n">trace_to_jaxpr_dynamic</span><span class="p">(</span><span class="n">f_ivjp</span><span class="p">,</span> <span class="n">avals_in</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">core</span><span class="o">.</span><span class="n">ClosedJaxpr</span><span class="p">(</span><span class="n">jaxpr_out</span><span class="p">,</span> <span class="n">literals_out</span><span class="p">),</span> <span class="n">out_nonzeros</span><span class="p">()</span>
+
+<span class="c1">#def _pjit_ivjp(primals_in, tangents_in, jaxpr, in_shardings, out_shardings,</span>
+<span class="c1">#               resource_env, donated_invars, name, keep_unused, inline):</span>
+<span class="k">def</span> <span class="nf">_pjit_ivjp</span><span class="p">(</span><span class="n">primals_in</span><span class="p">,</span> <span class="n">primals_out</span><span class="p">,</span> <span class="n">tangents_in</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
+  <span class="kn">import</span> <span class="nn">pdb</span><span class="p">;</span> <span class="n">pdb</span><span class="o">.</span><span class="n">set_trace</span><span class="p">()</span>
+  <span class="n">is_nz_tangents_in</span> <span class="o">=</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">ad</span><span class="o">.</span><span class="n">Zero</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tangents_in</span><span class="p">]</span>
+  <span class="c1">#jaxpr_ivjp, is_nz_tangents_out = ivjp_jaxpr(</span>
+  <span class="c1">#    jaxpr, is_nz_tangents_in, instantiate=False)</span>
+  <span class="n">jaxpr_ivjp</span><span class="p">,</span> <span class="n">is_nz_tangents_out</span> <span class="o">=</span> <span class="n">ivjp_jaxpr</span><span class="p">(</span>
+      <span class="n">jaxpr</span><span class="p">,</span> <span class="n">is_nz_tangents_in</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">_filter_zeros</span><span class="p">(</span><span class="n">is_nz_l</span><span class="p">,</span> <span class="n">l</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">x</span> <span class="k">for</span> <span class="n">nz</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">is_nz_l</span><span class="p">,</span> <span class="n">l</span><span class="p">)</span> <span class="k">if</span> <span class="n">nz</span><span class="p">)</span>
+  <span class="n">_filter_zeros_in</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_filter_zeros</span><span class="p">,</span> <span class="n">is_nz_tangents_in</span><span class="p">)</span>
+  <span class="n">_filter_zeros_out</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_filter_zeros</span><span class="p">,</span> <span class="n">is_nz_tangents_out</span><span class="p">)</span>
+  <span class="n">outputs</span> <span class="o">=</span> <span class="n">pjit_p</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span>
+      <span class="o">*</span><span class="n">primals_in</span><span class="p">,</span> <span class="o">*</span><span class="n">_filter_zeros_in</span><span class="p">(</span><span class="n">tangents_in</span><span class="p">),</span>
+      <span class="n">jaxpr</span><span class="o">=</span><span class="n">jaxpr_ivjp</span><span class="p">)</span>
+<span class="w">  </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">      in_shardings=(*in_shardings, *_filter_zeros_in(in_shardings)),</span>
+<span class="sd">      out_shardings=(*out_shardings, *_filter_zeros_out(out_shardings)),</span>
+<span class="sd">      resource_env=resource_env,</span>
+<span class="sd">      donated_invars=(*donated_invars, *_filter_zeros_in(donated_invars)),</span>
+<span class="sd">      name=name,</span>
+<span class="sd">      keep_unused=keep_unused,</span>
+<span class="sd">      inline=inline)</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+
+  <span class="n">primals_out</span><span class="p">,</span> <span class="n">tangents_out</span> <span class="o">=</span> <span class="n">split_list</span><span class="p">(</span><span class="n">outputs</span><span class="p">,</span> <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">outvars</span><span class="p">)])</span>
+  <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">primals_out</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">outvars</span><span class="p">)</span>
+  <span class="n">tangents_out_it</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">tangents_out</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">primals_out</span><span class="p">,</span> <span class="p">[</span><span class="nb">next</span><span class="p">(</span><span class="n">tangents_out_it</span><span class="p">)</span> <span class="k">if</span> <span class="n">nz</span> <span class="k">else</span> <span class="n">ad</span><span class="o">.</span><span class="n">Zero</span><span class="p">(</span><span class="n">aval</span><span class="p">)</span>
+                       <span class="k">for</span> <span class="n">nz</span><span class="p">,</span> <span class="n">aval</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">is_nz_tangents_out</span><span class="p">,</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">out_avals</span><span class="p">)]</span>
+
+<span class="c1">#primitive_ivjps[pjit_p] = _pjit_ivjp</span>
+
+<span class="nd">@lu</span><span class="o">.</span><span class="n">transformation_with_aux</span>
+<span class="k">def</span> <span class="nf">f_ivjp_traceable</span><span class="p">(</span><span class="n">nonzeros</span><span class="p">,</span> <span class="o">*</span><span class="n">primals_and_nztangents</span><span class="p">):</span>
+  <span class="n">num_primals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nonzeros</span><span class="p">)</span>
+  <span class="n">primals</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">primals_and_nztangents</span><span class="p">[:</span><span class="n">num_primals</span><span class="p">])</span>
+  <span class="n">nonzero_tangents</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">primals_and_nztangents</span><span class="p">[</span><span class="n">num_primals</span><span class="p">:])</span>
+  <span class="n">tangents</span> <span class="o">=</span> <span class="p">[</span><span class="nb">next</span><span class="p">(</span><span class="n">nonzero_tangents</span><span class="p">)</span> <span class="k">if</span> <span class="n">nz</span> <span class="k">else</span> <span class="n">Zero</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+              <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">nz</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">primals</span><span class="p">,</span> <span class="n">nonzeros</span><span class="p">)]</span>
+  <span class="n">primals_out</span><span class="p">,</span> <span class="n">tangents_out</span> <span class="o">=</span> <span class="k">yield</span> <span class="p">(</span><span class="n">primals</span><span class="p">,</span> <span class="n">tangents</span><span class="p">),</span> <span class="p">{}</span>
+  <span class="n">out_nonzeros</span> <span class="o">=</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Zero</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tangents_out</span><span class="p">]</span>
+  <span class="n">nonzero_tangents_out</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tangents_out</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Zero</span><span class="p">]</span>
+  <span class="k">yield</span> <span class="nb">list</span><span class="p">(</span><span class="n">primals_out</span><span class="p">)</span> <span class="o">+</span> <span class="n">nonzero_tangents_out</span><span class="p">,</span> <span class="n">out_nonzeros</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Michael Harradon.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

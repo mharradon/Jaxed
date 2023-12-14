@@ -2,12 +2,12 @@
    to your liking, but it should at least contain the root `toctree` 
    directive.
 
-Welcome to the Jaxed documentation!
-==================================
+Jaxed
+=====
 
 .. toctree::
    :maxdepth: 2
 
-   modules
+.. include:: include_readme.rst
 
-* :ref:`genindex`
+.. include:: modules.rst

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>jaxed.internals package &mdash; Jaxed 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=2709fde1"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="jaxed package" href="jaxed.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Jaxed
+          </a>
+              <div class="version">
+                0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="jaxed.html">jaxed package</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="jaxed.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">jaxed.internals package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jaxed.internals.api">jaxed.internals.api module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jaxed.internals.invertible_ad">jaxed.internals.invertible_ad module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jaxed.internals.lax_extensions">jaxed.internals.lax_extensions module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jaxed.internals">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jaxed.html#module-jaxed">Module contents</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Jaxed</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="jaxed.html">jaxed package</a></li>
+      <li class="breadcrumb-item active">jaxed.internals package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/jaxed.internals.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="jaxed-internals-package">
+<h1>jaxed.internals package<a class="headerlink" href="#jaxed-internals-package" title="Link to this heading">¶</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-jaxed.internals.api">
+<span id="jaxed-internals-api-module"></span><h2>jaxed.internals.api module<a class="headerlink" href="#module-jaxed.internals.api" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.api.invertible">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.api.</span></span><span class="sig-name descname"><span class="pre">invertible</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fun</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span></span></span><a class="reference internal" href="_modules/jaxed/internals/api.html#invertible"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.api.invertible" title="Link to this definition">¶</a></dt>
+<dd><p>Asserts that the decorated function is invertible.
+Applying reverse-mode AD to a decorated function will use a more memory efficient
+procedure than usual, which will reconstruct the necessary intermediate values
+by inverting the function. Note that this might degrade the numerical accuracy of
+obtained gradients if the inverse is unstable.
+Args:</p>
+<blockquote>
+<div><p>fun: The function assumed to be invertible.</p>
+</div></blockquote>
+</dd></dl>
+
+</section>
+<section id="module-jaxed.internals.invertible_ad">
+<span id="jaxed-internals-invertible-ad-module"></span><h2>jaxed.internals.invertible_ad module<a class="headerlink" href="#module-jaxed.internals.invertible_ad" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.DontFlatten">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">DontFlatten</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#DontFlatten"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.DontFlatten" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.custom_ivjp">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">custom_ivjp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fun</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#custom_ivjp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.custom_ivjp" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.custom_ivjp.defivjp">
+<span class="sig-name descname"><span class="pre">defivjp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ivjp</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#custom_ivjp.defivjp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.custom_ivjp.defivjp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.definverse">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">definverse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inverse_rule</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#definverse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.definverse" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.get_primitive_inverse">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">get_primitive_inverse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#get_primitive_inverse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.get_primitive_inverse" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.inv_backward_pass">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">inv_backward_pass</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">jaxpr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Jaxpr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">consts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primals_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primals_out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cotangents_in</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#inv_backward_pass"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.inv_backward_pass" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.invertible">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">invertible</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fun</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#invertible"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.invertible" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.ivjp_jaxpr">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">ivjp_jaxpr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">jaxpr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ClosedJaxpr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nonzeros</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">instantiate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ClosedJaxpr</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#ivjp_jaxpr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.ivjp_jaxpr" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.split">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">split</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">l</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parts</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#split"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.split" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.synthesize_ivjp">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">synthesize_ivjp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">eqn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unknown_primals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primals_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primals_out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cts_in</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#synthesize_ivjp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.synthesize_ivjp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.internals.invertible_ad.zip_with">
+<span class="sig-prename descclassname"><span class="pre">jaxed.internals.invertible_ad.</span></span><span class="sig-name descname"><span class="pre">zip_with</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fun</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/internals/invertible_ad.html#zip_with"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.internals.invertible_ad.zip_with" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="module-jaxed.internals.lax_extensions">
+<span id="jaxed-internals-lax-extensions-module"></span><h2>jaxed.internals.lax_extensions module<a class="headerlink" href="#module-jaxed.internals.lax_extensions" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-jaxed.internals">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-jaxed.internals" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="jaxed.html" class="btn btn-neutral float-left" title="jaxed package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Michael Harradon.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
