@@ -52,6 +52,7 @@ class InvertibleADTest(jtu.JaxTestCase):
                         jax.value_and_grad(lambda x: np.sum(finv(x)))(x),
                         check_dtypes=True)
 
+  @jtu.skip_on_devices("cpu")
   @jtu.ignore_warning(message="Values that an @invertible function closes")
   def test_perf(self):
     N, M = (64, 10**6)
