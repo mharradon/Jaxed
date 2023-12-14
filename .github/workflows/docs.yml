@@ -42,7 +42,7 @@ jobs:
         run: python -m unittest
       - name: Build docs
         run: |
-          sphinx-apidoc -o docs/source jaxed && sphinx-build -b html docs/source docs/build_html
+          sphinx-apidoc --maxdepth 3 --ext-mathjax --ext-viewcode -f -o docs/source jaxed && sphinx-build -b html docs/source docs/build_html
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
