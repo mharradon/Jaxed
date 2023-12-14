@@ -26,7 +26,7 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout 
@@ -43,7 +43,7 @@ jobs:
       - name: Build docs
         run: |
           sphinx-apidoc -o docs/source jaxed && sphinx-build -b html docs/source docs/build_html
-      - name: Deploy to pages
+      - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}

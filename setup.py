@@ -11,4 +11,6 @@ with open(os.path.join(here, 'jaxed', '__version__.py')) as f:
 
 # package configuration - for reference see:
 # https://setuptools.readthedocs.io/en/latest/setuptools.html#id9
-setup(version=about['__version__'])
+setup(version=about['__version__'],
+      packages=['jaxed'],
+      include_package_data=True)
