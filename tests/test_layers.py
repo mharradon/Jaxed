@@ -64,20 +64,24 @@ class LayerTests(jtu.JaxTestCase):
       blocks.append(RevNetBlock(nn.Dense(N),
                                 nn.Dense(N),
                                 use_inverse=False))
-      blocks.append(RevNetBlock(nn.Dense(N),
-                                nn.Dense(N),
-                                use_inverse=True))
+      blocks_inv.append(RevNetBlock(nn.Dense(N),
+                                    nn.Dense(N),
+                                    use_inverse=True))
       net = nn.Sequential(blocks + [jnp.sum])
+      net_inv = nn.Sequential(blocks_inv + [jnp.sum])
       params_key = jax.random.key(0)
       params = net.init(params_key,
-                        np.ones((32, 32)),
-                        np.ones((32, 32)))
+                        np.ones((N, N)),
+                        np.ones((N, N)))
+      params_inv = net_inv.init(params_key,
+                                np.ones((N, N)),
+                                np.ones((N, N)))
 
       def v_and_g(params):
         def fwd(p):
           rev_block.apply({'params': p},
-                          np.ones((32, 32)),
-                          np.ones((32, 32)))
+                          np.ones((N, N)),
+                          np.ones((N, N)))
         return jax.value_and_grad(fwd, argnums=(0,))(params)
 
       v_and_g(params)
