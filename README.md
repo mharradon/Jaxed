@@ -7,7 +7,7 @@ Reversible Automatic Differentiation in Jax
 
 [![docs](https://github.com/mharradon/Jaxed/actions/workflows/docs.yml/badge.svg)](https://mharradon.github.io/Jaxed/)
 
-Reversible Automatic Differentiation[^1] (RAD) is a modification of the standard Reverse-Mode Automatic Differentiation (AD) algorithm used in deep learning designed to greatly reduce GPU memory requirements. This library attempts to maintain an implementation of RAD in JAX as well as a number of neural network components that take advantage of it.
+Reversible Automatic Differentiation[^1] (RAD) (or Invertible Automatic Differentation) is a modification of the standard Reverse-Mode Automatic Differentiation (AD) algorithm used in deep learning designed to greatly reduce GPU memory requirements. This library attempts to maintain an implementation of RAD in JAX as well as a number of neural network components that take advantage of it.
 
 Typically in AD the activations of each layer are saved to be re-used in the calculation of a jacobian vector product (JVP) during the backwards pass. This is often the dominant contributors to memory usage during training. The idea of RAD is to recalculate activations on-the-fly by using invertible functions for all or part of a deep neural network architecture. During the backwards pass the activations can then by calculated one-by-one as the algorithm proceeds backwards through the network.
 
