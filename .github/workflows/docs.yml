@@ -1,5 +1,5 @@
 # Simple workflow for deploying static content to GitHub Pages
-name: Deploy docs to Pages
+name: Deploy
 
 on:
   # Runs on pushes targeting the default branch
@@ -26,19 +26,24 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout 
         uses: actions/checkout@v4
-      - uses: actions/setup-python@v3
-      - name: Install dependencies
+      - name: Install Dependencies
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache-dependency-path: 'pyproject.toml'
+          cache: 'pip'
+      - run: pip install -e .[dev]
+      - name: Run Tests
+        run: python -m unittest
+      - name: Build docs
         run: |
-          pip install sphinx sphinx_rtd_theme myst_parser
-      - name: Sphinx build
-        run: |
-          sphinx-build -b html docs/source docs/build_html
-      - name: Deploy to pages
+          sphinx-apidoc --maxdepth 3 --ext-mathjax --ext-viewcode -f -o docs/source jaxed && sphinx-build -b html docs/source docs/build_html
+      - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}

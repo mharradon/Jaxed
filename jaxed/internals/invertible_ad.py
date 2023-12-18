@@ -29,6 +29,7 @@ from jax._src.util import safe_map, safe_zip, split_list, weakref_lru_cache
 from jax._src import custom_derivatives
 from jax._src.config import config
 from jax._src.pjit import pjit_p
+from jax._src.interpreters import mlir
 
 map = safe_map
 zip = safe_zip
@@ -326,6 +327,19 @@ def definverse(primitive, inverse_rule):
 
 jax.custom_ivjp = custom_ivjp
 
+def _custom_ivjp_call_mlir_translation(ctx, *args, fun_jaxpr, ivjp_jaxpr):
+  del ivjp_jaxpr
+  args_ = map(mlir.wrap_singleton_ir_values, args)
+  consts = mlir._ir_consts(fun_jaxpr.consts)
+  out, tokens = mlir.jaxpr_subcomp(ctx.module_context, fun_jaxpr.jaxpr,
+                                   ctx.tokens_in, consts, *args_,
+                                   dim_var_values=ctx.dim_var_values)
+  ctx.set_tokens_out(tokens)
+  return out
+
+mlir.register_lowering(custom_ivjp_p, _custom_ivjp_call_mlir_translation)
+
+"""
 ################################################################################
 # PJIT Stuff
 ################################################################################
@@ -349,7 +363,6 @@ def _ivjp_jaxpr(jaxpr, nonzeros, instantiate):
 #def _pjit_ivjp(primals_in, tangents_in, jaxpr, in_shardings, out_shardings,
 #               resource_env, donated_invars, name, keep_unused, inline):
 def _pjit_ivjp(primals_in, primals_out, tangents_in, **params):
-  import pdb; pdb.set_trace()
   is_nz_tangents_in = [type(t) is not ad.Zero for t in tangents_in]
   #jaxpr_ivjp, is_nz_tangents_out = ivjp_jaxpr(
   #    jaxpr, is_nz_tangents_in, instantiate=False)
@@ -362,8 +375,7 @@ def _pjit_ivjp(primals_in, primals_out, tangents_in, **params):
   _filter_zeros_out = partial(_filter_zeros, is_nz_tangents_out)
   outputs = pjit_p.bind(
       *primals_in, *_filter_zeros_in(tangents_in),
-      jaxpr=jaxpr_ivjp)
-  """
+      jaxpr=jaxpr_ivjp,
       in_shardings=(*in_shardings, *_filter_zeros_in(in_shardings)),
       out_shardings=(*out_shardings, *_filter_zeros_out(out_shardings)),
       resource_env=resource_env,
@@ -371,7 +383,6 @@ def _pjit_ivjp(primals_in, primals_out, tangents_in, **params):
       name=name,
       keep_unused=keep_unused,
       inline=inline)
-  """
 
   primals_out, tangents_out = split_list(outputs, [len(jaxpr.jaxpr.outvars)])
   assert len(primals_out) == len(jaxpr.jaxpr.outvars)
@@ -392,3 +403,4 @@ def f_ivjp_traceable(nonzeros, *primals_and_nztangents):
   out_nonzeros = [type(t) is not Zero for t in tangents_out]
   nonzero_tangents_out = [t for t in tangents_out if type(t) is not Zero]
   yield list(primals_out) + nonzero_tangents_out, out_nonzeros
+"""

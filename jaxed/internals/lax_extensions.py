@@ -2,6 +2,10 @@ from jax._src.lax import lax
 
 from . import invertible_ad as iad
 
+"""
+Implementations for various inverse operators.
+"""
+
 def _add_inverse(r, x, y):
   xr = r - y
   yr = r - x
@@ -31,4 +35,3 @@ iad.definverse(lax.add_p, _add_inverse)
 iad.definverse(lax.sub_p, _sub_inverse)
 iad.definverse(lax.mul_p, _mul_inverse)
 iad.definverse(lax.div_p, _div_inverse)
-
