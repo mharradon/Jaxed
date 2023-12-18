@@ -17,7 +17,7 @@ import flax.linen as nn
 import jaxed
 from jaxed.layers import RevNetBlock, Invertible
 from jaxed.layers.revnet import _RevNetBlockRef
-from jaxed.utils import timefunc, SuppressOOM
+from jaxed.utils import timefunc
 
 class LayerTests(jtu.JaxTestCase):
 
@@ -117,25 +117,24 @@ class LayerTests(jtu.JaxTestCase):
 
       print(f"{num_blocks} Blocks:")
 
-      with SuppressOOM():
-        params = net.init(params_key, *xs)
-        params_inv = net_inv.init(params_key, *xs)
-        params_ref = net_ref.init(params_key, *xs)
-        if normal_ad_block_limit is None:
-          try:
-            print(f"Normal AD: {timefunc(v_and_g, params, xs, N=5)} s")
-          except XlaRuntimeError as E:
-            sleep(3) # Print after OOM spew
-            print(f"Normal AD OOMd at {num_blocks} blocks! {E}")
-            normal_ad_block_limit = num_blocks
-
+      params = net.init(params_key, *xs)
+      params_inv = net_inv.init(params_key, *xs)
+      params_ref = net_ref.init(params_key, *xs)
+      if normal_ad_block_limit is None:
         try:
-          print(f"Reversible AD: {timefunc(v_and_g_inv, params_inv, xs, N=5)} s")
+          print(f"Normal AD: {timefunc(v_and_g, params, xs, N=5)} s")
         except XlaRuntimeError as E:
           sleep(3) # Print after OOM spew
-          print(f"Reversible AD OOMd at {num_blocks} blocks! {E}")
-          rev_ad_block_limit = num_blocks
-          break
+          print(f"Normal AD OOMd at {num_blocks} blocks! {E}")
+          normal_ad_block_limit = num_blocks
+
+      try:
+        print(f"Reversible AD: {timefunc(v_and_g_inv, params_inv, xs, N=5)} s")
+      except XlaRuntimeError as E:
+        sleep(3) # Print after OOM spew
+        print(f"Reversible AD OOMd at {num_blocks} blocks! {E}")
+        rev_ad_block_limit = num_blocks
+        break
 
     print(f"Reversible AD does not OOM until at least {2*num_blocks} blocks!")
 
