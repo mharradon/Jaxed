@@ -13,6 +13,7 @@ import flax.linen as nn
 
 import jaxed
 from jaxed.layers import RevNetBlock
+from jaxed.utils import timefunc
 
 class LayerTests(jtu.JaxTestCase):
 
@@ -22,14 +23,14 @@ class LayerTests(jtu.JaxTestCase):
 
     def net(x1, x2):
       for i in range(2):
-        x1, x2 = rev_block.apply({'params':params},
+        x1, x2 = rev_block.apply(params,
                                  x1, 
                                  x2)
       return x1, x2
 
     def net_inv(x1, x2):
       for i in range(2):
-        x1, x2 = rev_block_inv.apply({'params':params_inv},
+        x1, x2 = rev_block_inv.apply(params_inv,
                                  x1, 
                                  x2)
       return x1, x2
@@ -67,8 +68,8 @@ class LayerTests(jtu.JaxTestCase):
       blocks_inv.append(RevNetBlock(nn.Dense(N),
                                     nn.Dense(N),
                                     use_inverse=True))
-      net = nn.Sequential(blocks + [jnp.sum])
-      net_inv = nn.Sequential(blocks_inv + [jnp.sum])
+      net = nn.Sequential(blocks) # + [jnp.sum])
+      net_inv = nn.Sequential(blocks_inv) # + [jnp.sum])
       params_key = jax.random.key(0)
       params = net.init(params_key,
                         np.ones((N, N)),
@@ -79,12 +80,25 @@ class LayerTests(jtu.JaxTestCase):
 
       def v_and_g(params):
         def fwd(p):
-          rev_block.apply({'params': p},
+          out = net.apply(p,
                           np.ones((N, N)),
                           np.ones((N, N)))
+          return jnp.sum(out[0] + out[1])
         return jax.value_and_grad(fwd, argnums=(0,))(params)
 
-      v_and_g(params)
+      def v_and_g_inv(params):
+        def fwd(p):
+          out = net_inv.apply(p,
+                              np.ones((N, N)),
+                              np.ones((N, N)))
+          return jnp.sum(out[0] + out[1])
+        return jax.value_and_grad(fwd, argnums=(0,))(params)
+
+      print(v_and_g(params))
+      print(v_and_g_inv(params))
+
+      print(f"Normal AD: {timefunc(v_and_g, params)} s")
+      print(f"Reversible AD: {timefunc(v_and_g_inv, params_inv)} s")
 
 
 def make_basic_rev_block(use_inverse):
@@ -95,7 +109,7 @@ def make_basic_rev_block(use_inverse):
                           np.ones((1,)), 
                           np.ones((1,)))
 
-  rev_block.apply({'params':params},
+  rev_block.apply(params,
                   np.ones((1,)), 
                   np.ones((1,)))
 

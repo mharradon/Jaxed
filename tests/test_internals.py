@@ -12,6 +12,8 @@ from jax._src import test_util as jtu
 
 import jaxed
 
+from jaxed.utils import timefunc
+
 class InvertibleADTest(jtu.JaxTestCase):
 
   @jtu.ignore_warning(message="Values that an @invertible function closes")
@@ -191,13 +193,6 @@ class InvertibleADTest(jtu.JaxTestCase):
     self.assertAllClose(jax.value_and_grad(lambda x: np.sum(f((x, x), x)[0]))(o),
                         jax.value_and_grad(lambda x: np.sum(finv((x, x), x)[0]))(o),
                         check_dtypes=True)
-
-def timefunc(f, *args, N=40):
-    tic = time()
-    for i in range(N):
-      _ = f(*args)
-    avg_runtime = (time() - tic) / N
-    return avg_runtime
 
 if __name__ == "__main__":
   absltest.main(testLoader=jtu.JaxTestLoader())

@@ -8,7 +8,7 @@ class RevNetBlock(nn.Module):
   g: nn.Module
   use_inverse: bool = True
 
-"""
+  """
   def setup(self):
     @jax.custom_ivjp
     def rev_block(x1, x2):
@@ -34,15 +34,15 @@ class RevNetBlock(nn.Module):
       x1 = y1 - fo
 
       return (x1, x2), (dx1, dx2)
-"""
+  """
 
-
+  @nn.compact
   def __call__(self, x1, x2):
     def ffunc(fx, params):
-      return self.f.apply({'params': params}, *fx)
+      return self.f.apply(params, fx)
 
     def gfunc(gx, params):
-      return self.g.apply({'params': params}, *gx)
+      return self.g.apply(params, gx)
 
     @jax.custom_ivjp
     def fwd_res_block(x1, x2, fparams, gparams):
@@ -77,7 +77,7 @@ class RevNetBlock(nn.Module):
     if self.use_inverse:
       fwd_res_block = jax.invertible(fwd_res_block)
 
-    fparams = self.param('f', self.f.init, jax.random.PRNGKey(0), x1)
-    gparams = self.param('g', self.g.init, jax.random.PRNGKey(0), x2)
+    fparams = self.param('fshadow', self.f.init, x1)
+    gparams = self.param('gshadow', self.g.init, x2)
 
     return fwd_res_block(x1, x2, fparams, gparams)
