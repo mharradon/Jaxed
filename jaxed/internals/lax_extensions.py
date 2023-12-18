@@ -35,4 +35,3 @@ iad.definverse(lax.add_p, _add_inverse)
 iad.definverse(lax.sub_p, _sub_inverse)
 iad.definverse(lax.mul_p, _mul_inverse)
 iad.definverse(lax.div_p, _div_inverse)
-

@@ -8,6 +8,7 @@ Subpackages
    :maxdepth: 3
 
    jaxed.internals
+   jaxed.layers
 
 Module contents
 ---------------
