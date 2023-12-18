@@ -7,6 +7,7 @@ from jax import numpy as jnp
 from jax import lax
 from absl.testing import absltest
 import jaxlib
+from jaxlib.xla_extension import XlaRuntimeError
 
 from jax._src import test_util as jtu
 
@@ -79,7 +80,7 @@ class InvertibleADTest(jtu.JaxTestCase):
         xval = jnp.ones((M * MMul,))
         v_and_g_result = v_and_g(xval)
         MMul *= 2
-      except Exception as E:  
+      except XlaRuntimeError as E:
         # Memory error
         normal_ad_mem_limit = MMul
         break
@@ -90,7 +91,7 @@ class InvertibleADTest(jtu.JaxTestCase):
         xval = jnp.ones((M * MMul,))
         v_and_g_result_by_inv = v_and_g_by_inv(xval)
         MMul *= 2
-      except Exception as E:  
+      except XlaRuntimeError as E:
         # Memory error
         inv_ad_mem_limit = MMul
         break
@@ -110,7 +111,7 @@ class InvertibleADTest(jtu.JaxTestCase):
     #normal_jaxpr = jax.make_jaxpr(v_and_g)(xval)
     #inv_jaxpr = jax.make_jaxpr(v_and_g_by_inv)(xval)
 
-    xval = jnp.ones((M,))
+    xval = jnp.ones((M * (normal_ad_mem_limit - 2),))
     inv_time = timefunc(v_and_g_by_inv, xval)
     normal_time = timefunc(v_and_g, xval)
 

@@ -1,19 +1,23 @@
 from functools import partial
+from itertools import count
 
 import numpy as np
 from absl.testing import absltest
+from time import sleep
 
 import jax
 from jax import numpy as jnp
 from jax import lax
 import jaxlib
+from jaxlib.xla_extension import XlaRuntimeError
 from jax._src import test_util as jtu
 
 import flax.linen as nn
 
 import jaxed
 from jaxed.layers import RevNetBlock
-from jaxed.utils import timefunc
+from jaxed.layers.revnet import _RevNetBlockRef
+from jaxed.utils import timefunc, SuppressOOM
 
 class LayerTests(jtu.JaxTestCase):
 
@@ -58,51 +62,74 @@ class LayerTests(jtu.JaxTestCase):
   @jtu.skip_on_devices("cpu")
   def test_perf(self):
     blocks = []
-    blocks_inv = []
     N = 64
-    #while True:
-    for i in range(1):
-      blocks.append(RevNetBlock(nn.Dense(N),
-                                nn.Dense(N),
-                                use_inverse=False))
-      blocks_inv.append(RevNetBlock(nn.Dense(N),
-                                    nn.Dense(N),
-                                    use_inverse=True))
-      net = nn.Sequential(blocks) # + [jnp.sum])
-      net_inv = nn.Sequential(blocks_inv) # + [jnp.sum])
+    normal_ad_block_limit = None
+    rev_ad_block_limit = None
+    blocks = [RevNetBlock(DenseWithAct(N),
+                          DenseWithAct(N))]
+    blocks_ref = [_RevNetBlockRef(DenseWithAct(N),
+                                  DenseWithAct(N))]
+    xs = (np.ones((N, N, N, N), dtype='float32'),
+          np.ones((N, N, N, N), dtype='float32'))
+    for i in range(8):
+      for _ in range(2**i):
+        blocks.append(RevNetBlock(DenseWithAct(N),
+                                  DenseWithAct(N)))
+        blocks_ref.append(_RevNetBlockRef(DenseWithAct(N),
+                                          DenseWithAct(N)))
+      num_blocks = len(blocks)
+
+      net = nn.Sequential(blocks)
+      net_ref = nn.Sequential(blocks_ref)
       params_key = jax.random.key(0)
-      params = net.init(params_key,
-                        np.ones((N, N)),
-                        np.ones((N, N)))
-      params_inv = net_inv.init(params_key,
-                                np.ones((N, N)),
-                                np.ones((N, N)))
 
-      def v_and_g(params):
-        def fwd(p):
-          out = net.apply(p,
-                          np.ones((N, N)),
-                          np.ones((N, N)))
+      @jax.jit
+      def v_and_g(params, x):
+        def fwd(p, x):
+          out = net.apply(p, *x)
           return jnp.sum(out[0] + out[1])
-        return jax.value_and_grad(fwd, argnums=(0,))(params)
+        return jax.value_and_grad(fwd, argnums=(0,))(params, x)
 
-      def v_and_g_inv(params):
-        def fwd(p):
-          out = net_inv.apply(p,
-                              np.ones((N, N)),
-                              np.ones((N, N)))
+      @jax.jit
+      def v_and_g_inv(params, x):
+        @jax.invertible
+        def basefwd(p, x):
+          return net.apply(p, *x)
+
+        def fwd(p, x):
+          out = basefwd(p, x)
           return jnp.sum(out[0] + out[1])
-        return jax.value_and_grad(fwd, argnums=(0,))(params)
 
-      print(v_and_g(params))
-      print(v_and_g_inv(params))
+        return jax.value_and_grad(fwd, argnums=(0,))(params, x)
 
-      print(f"Normal AD: {timefunc(v_and_g, params)} s")
-      print(f"Reversible AD: {timefunc(v_and_g_inv, params_inv)} s")
+      #print(v_and_g(params))
+      #print(v_and_g_inv(params))
+      print(f"{num_blocks} Blocks:")
 
+      with SuppressOOM():
+        params = net.init(params_key, *xs)
+        params_ref = net_ref.init(params_key, *xs)
+        import pdb; pdb.set_trace()
+        if normal_ad_block_limit is None:
+          try:
+            print(f"Normal AD: {timefunc(v_and_g, params, xs, N=5)} s")
+          except XlaRuntimeError as E:
+            sleep(3) # Print after OOM spew
+            print(f"Normal AD OOMd at {num_blocks} blocks! {E}")
+            normal_ad_block_limit = num_blocks
+
+        try:
+          print(f"Reversible AD: {timefunc(v_and_g_inv, params, xs, N=5)} s")
+        except XlaRuntimeError as E:
+          sleep(3) # Print after OOM spew
+          print(f"Reversible AD OOMd at {num_blocks} blocks! {E}")
+          rev_ad_block_limit = num_blocks
+          break
+
+    print(f"Reversible AD does not OOM until at least {2*num_blocks} blocks!")
 
 def make_basic_rev_block(use_inverse):
-  rev_block = RevNetBlock(SinLayer(), CosLayer(), use_inverse=use_inverse)
+  rev_block = RevNetBlock(SinLayer(), CosLayer())
 
   params_key = jax.random.key(0)
   params = rev_block.init(params_key, 
@@ -122,6 +149,14 @@ class CosLayer(nn.Module):
 class SinLayer(nn.Module):
   def __call__(self, x):
     return jnp.sin(x)
+
+class DenseWithAct(nn.Module):
+  n: int
+  @nn.compact
+  def __call__(self, x):
+    x = nn.Dense(self.n)(x)
+    x = nn.activation.relu(x)
+    return x
 
 if __name__ == "__main__":
   absltest.main(testLoader=jtu.JaxTestLoader())
