@@ -75,9 +75,33 @@
 Jaxed
 </h1>
 <h2 align="center">
-Resurrecting Reversible Automatic Differentiation in Jax
+Reversible Automatic Differentiation in Jax
 </h2>
 <p><a class="reference external" href="https://mharradon.github.io/Jaxed/"><img alt="docs" src="https://github.com/mharradon/Jaxed/actions/workflows/docs.yml/badge.svg" /></a></p>
+<p>Reversible Automatic Differentiation<a href="#id1"><span class="problematic" id="id1">[^1]</span></a> (RAD) (or Invertible Automatic Differentation) is a modification of the standard Reverse-Mode Automatic Differentiation (AD) algorithm used in deep learning designed to greatly reduce GPU memory requirements. This library attempts to maintain an implementation of RAD in JAX as well as a number of neural network components that take advantage of it.</p>
+<p>Typically in AD the activations of each layer are saved to be re-used in the calculation of a jacobian vector product (JVP) during the backwards pass. This is often the dominant contributors to memory usage during training. The idea of RAD is to recalculate activations on-the-fly by using invertible functions for all or part of a deep neural network architecture. During the backwards pass the activations can then by calculated one-by-one as the algorithm proceeds backwards through the network.</p>
+<p>Applying RAD to a DNN requires two things:</p>
+<ol class="arabic simple">
+<li><p>Implementations of inverse operations for the invertible functions employed, and</p></li>
+<li><p>An alternate implementation of AD that uses these inverse operators to calculate JVPs in place of pre-computed activations</p></li>
+</ol>
+<p>This package resurrects a JAX<a href="#id2"><span class="problematic" id="id2">[^2]</span></a> implementation of RAD as a JAX interpreter and aims to collect a variety of invertible functions and Flax<a href="#id3"><span class="problematic" id="id3">[^3]</span></a> layers. The original implementation was part of JAX core for some time before being removed due to lack of use. To my knowledge the integration with Flax is new.</p>
+<p>This repo is under active development and likely to change significantly in the relative near term. PRs or issue reports are welcome.</p>
+<hr class="footnotes docutils" />
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id4" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></span>
+<p>Gomez, Aidan N., et al. “The reversible residual network: Backpropagation without storing activations.” Advances in neural information processing systems 30 (2017).</p>
+</aside>
+<aside class="footnote brackets" id="id5" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></span>
+<p>https://github.com/google/jax</p>
+</aside>
+<aside class="footnote brackets" id="id6" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></span>
+<p>https://github.com/google/flax</p>
+</aside>
+</aside>
 
 
            </div>

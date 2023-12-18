@@ -49,6 +49,13 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">jaxed package</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#subpackages">Subpackages</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="jaxed.internals.html">jaxed.internals package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="jaxed.layers.html">jaxed.layers package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-jaxed.utils">jaxed.utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#jaxed.utils.SuppressOOM"><code class="docutils literal notranslate"><span class="pre">SuppressOOM</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#jaxed.utils.timefunc"><code class="docutils literal notranslate"><span class="pre">timefunc()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#module-jaxed">Module contents</a></li>
@@ -99,7 +106,6 @@
 <li class="toctree-l3"><a class="reference internal" href="jaxed.internals.html#jaxed.internals.invertible_ad.get_primitive_inverse"><code class="docutils literal notranslate"><span class="pre">get_primitive_inverse()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="jaxed.internals.html#jaxed.internals.invertible_ad.inv_backward_pass"><code class="docutils literal notranslate"><span class="pre">inv_backward_pass()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="jaxed.internals.html#jaxed.internals.invertible_ad.invertible"><code class="docutils literal notranslate"><span class="pre">invertible()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="jaxed.internals.html#jaxed.internals.invertible_ad.ivjp_jaxpr"><code class="docutils literal notranslate"><span class="pre">ivjp_jaxpr()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="jaxed.internals.html#jaxed.internals.invertible_ad.split"><code class="docutils literal notranslate"><span class="pre">split()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="jaxed.internals.html#jaxed.internals.invertible_ad.synthesize_ivjp"><code class="docutils literal notranslate"><span class="pre">synthesize_ivjp()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="jaxed.internals.html#jaxed.internals.invertible_ad.zip_with"><code class="docutils literal notranslate"><span class="pre">zip_with()</span></code></a></li>
@@ -109,8 +115,42 @@
 <li class="toctree-l2"><a class="reference internal" href="jaxed.internals.html#module-jaxed.internals">Module contents</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="jaxed.layers.html">jaxed.layers package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="jaxed.layers.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jaxed.layers.html#module-jaxed.layers.layers">jaxed.layers.layers module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jaxed.layers.html#jaxed.layers.layers.Invertible"><code class="docutils literal notranslate"><span class="pre">Invertible</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jaxed.layers.html#module-jaxed.layers.revnet">jaxed.layers.revnet module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jaxed.layers.html#jaxed.layers.revnet.RevNetBlock"><code class="docutils literal notranslate"><span class="pre">RevNetBlock</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jaxed.layers.html#module-jaxed.layers.utils">jaxed.layers.utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="jaxed.layers.html#jaxed.layers.utils.lower_submodule_to_function"><code class="docutils literal notranslate"><span class="pre">lower_submodule_to_function()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="jaxed.layers.html#module-jaxed.layers">Module contents</a></li>
+</ul>
+</li>
 </ul>
 </div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-jaxed.utils">
+<span id="jaxed-utils-module"></span><h2>jaxed.utils module<a class="headerlink" href="#module-jaxed.utils" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxed.utils.SuppressOOM">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxed.utils.</span></span><span class="sig-name descname"><span class="pre">SuppressOOM</span></span><a class="reference internal" href="_modules/jaxed/utils.html#SuppressOOM"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.utils.SuppressOOM" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxed.utils.timefunc">
+<span class="sig-prename descclassname"><span class="pre">jaxed.utils.</span></span><span class="sig-name descname"><span class="pre">timefunc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">40</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jaxed/utils.html#timefunc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxed.utils.timefunc" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </section>
 <section id="module-jaxed">
 <span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-jaxed" title="Link to this heading">¶</a></h2>

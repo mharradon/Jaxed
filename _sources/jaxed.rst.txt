@@ -8,6 +8,18 @@ Subpackages
    :maxdepth: 3
 
    jaxed.internals
+   jaxed.layers
+
+Submodules
+----------
+
+jaxed.utils module
+------------------
+
+.. automodule:: jaxed.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Module contents
 ---------------

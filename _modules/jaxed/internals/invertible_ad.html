@@ -102,6 +102,7 @@
 <span class="kn">from</span> <span class="nn">jax._src</span> <span class="kn">import</span> <span class="n">custom_derivatives</span>
 <span class="kn">from</span> <span class="nn">jax._src.config</span> <span class="kn">import</span> <span class="n">config</span>
 <span class="kn">from</span> <span class="nn">jax._src.pjit</span> <span class="kn">import</span> <span class="n">pjit_p</span>
+<span class="kn">from</span> <span class="nn">jax._src.interpreters</span> <span class="kn">import</span> <span class="n">mlir</span>
 
 <span class="nb">map</span> <span class="o">=</span> <span class="n">safe_map</span>
 <span class="nb">zip</span> <span class="o">=</span> <span class="n">safe_zip</span>
@@ -429,47 +430,55 @@
 
 <span class="n">jax</span><span class="o">.</span><span class="n">custom_ivjp</span> <span class="o">=</span> <span class="n">custom_ivjp</span>
 
-<span class="c1">################################################################################</span>
-<span class="c1"># PJIT Stuff</span>
-<span class="c1">################################################################################</span>
-<div class="viewcode-block" id="ivjp_jaxpr">
-<a class="viewcode-back" href="../../../jaxed.internals.html#jaxed.internals.invertible_ad.ivjp_jaxpr">[docs]</a>
-<span class="k">def</span> <span class="nf">ivjp_jaxpr</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">:</span> <span class="n">core</span><span class="o">.</span><span class="n">ClosedJaxpr</span><span class="p">,</span> <span class="n">nonzeros</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-               <span class="n">instantiate</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">bool</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">core</span><span class="o">.</span><span class="n">ClosedJaxpr</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">bool</span><span class="p">]]:</span>
-  <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">instantiate</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">bool</span><span class="p">:</span>
-    <span class="n">instantiate</span> <span class="o">=</span> <span class="p">(</span><span class="n">instantiate</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">out_avals</span><span class="p">)</span>
-  <span class="k">return</span> <span class="n">_ivjp_jaxpr</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">nonzeros</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">instantiate</span><span class="p">))</span></div>
+<span class="k">def</span> <span class="nf">_custom_ivjp_call_mlir_translation</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">fun_jaxpr</span><span class="p">,</span> <span class="n">ivjp_jaxpr</span><span class="p">):</span>
+  <span class="k">del</span> <span class="n">ivjp_jaxpr</span>
+  <span class="n">args_</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">mlir</span><span class="o">.</span><span class="n">wrap_singleton_ir_values</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+  <span class="n">consts</span> <span class="o">=</span> <span class="n">mlir</span><span class="o">.</span><span class="n">_ir_consts</span><span class="p">(</span><span class="n">fun_jaxpr</span><span class="o">.</span><span class="n">consts</span><span class="p">)</span>
+  <span class="n">out</span><span class="p">,</span> <span class="n">tokens</span> <span class="o">=</span> <span class="n">mlir</span><span class="o">.</span><span class="n">jaxpr_subcomp</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">module_context</span><span class="p">,</span> <span class="n">fun_jaxpr</span><span class="o">.</span><span class="n">jaxpr</span><span class="p">,</span>
+                                   <span class="n">ctx</span><span class="o">.</span><span class="n">tokens_in</span><span class="p">,</span> <span class="n">consts</span><span class="p">,</span> <span class="o">*</span><span class="n">args_</span><span class="p">,</span>
+                                   <span class="n">dim_var_values</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">dim_var_values</span><span class="p">)</span>
+  <span class="n">ctx</span><span class="o">.</span><span class="n">set_tokens_out</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">out</span>
 
+<span class="n">mlir</span><span class="o">.</span><span class="n">register_lowering</span><span class="p">(</span><span class="n">custom_ivjp_p</span><span class="p">,</span> <span class="n">_custom_ivjp_call_mlir_translation</span><span class="p">)</span>
 
-<span class="nd">@weakref_lru_cache</span>
-<span class="k">def</span> <span class="nf">_ivjp_jaxpr</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">,</span> <span class="n">nonzeros</span><span class="p">,</span> <span class="n">instantiate</span><span class="p">):</span>
-  <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">in_avals</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">nonzeros</span><span class="p">)</span>
-  <span class="n">f</span> <span class="o">=</span> <span class="n">lu</span><span class="o">.</span><span class="n">wrap_init</span><span class="p">(</span><span class="n">core</span><span class="o">.</span><span class="n">jaxpr_as_fun</span><span class="p">(</span><span class="n">jaxpr</span><span class="p">))</span>
-  <span class="n">f_ivjp</span><span class="p">,</span> <span class="n">out_nonzeros</span> <span class="o">=</span> <span class="n">f_ivjp_traceable</span><span class="p">(</span><span class="n">ivjp</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="n">instantiate</span><span class="p">,</span> <span class="n">transform_stack</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
-                                          <span class="n">nonzeros</span><span class="p">)</span>
-  <span class="n">tangent_avals</span> <span class="o">=</span> <span class="p">[</span><span class="n">aval</span> <span class="k">for</span> <span class="n">aval</span><span class="p">,</span> <span class="n">nz</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">in_avals</span><span class="p">,</span> <span class="n">nonzeros</span><span class="p">)</span> <span class="k">if</span> <span class="n">nz</span><span class="p">]</span>
-  <span class="n">avals_in</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">it</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">in_avals</span><span class="p">,</span> <span class="n">tangent_avals</span><span class="p">))</span>
-  <span class="n">jaxpr_out</span><span class="p">,</span> <span class="n">avals_out</span><span class="p">,</span> <span class="n">literals_out</span> <span class="o">=</span> <span class="n">pe</span><span class="o">.</span><span class="n">trace_to_jaxpr_dynamic</span><span class="p">(</span><span class="n">f_ivjp</span><span class="p">,</span> <span class="n">avals_in</span><span class="p">)</span>
-  <span class="k">return</span> <span class="n">core</span><span class="o">.</span><span class="n">ClosedJaxpr</span><span class="p">(</span><span class="n">jaxpr_out</span><span class="p">,</span> <span class="n">literals_out</span><span class="p">),</span> <span class="n">out_nonzeros</span><span class="p">()</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">################################################################################</span>
+<span class="sd"># PJIT Stuff</span>
+<span class="sd">################################################################################</span>
+<span class="sd">def ivjp_jaxpr(jaxpr: core.ClosedJaxpr, nonzeros: Sequence[bool],</span>
+<span class="sd">               instantiate: Union[bool, Sequence[bool]]) -&gt; tuple[core.ClosedJaxpr, list[bool]]:</span>
+<span class="sd">  if type(instantiate) is bool:</span>
+<span class="sd">    instantiate = (instantiate,) * len(jaxpr.out_avals)</span>
+<span class="sd">  return _ivjp_jaxpr(jaxpr, tuple(nonzeros), tuple(instantiate))</span>
 
-<span class="c1">#def _pjit_ivjp(primals_in, tangents_in, jaxpr, in_shardings, out_shardings,</span>
-<span class="c1">#               resource_env, donated_invars, name, keep_unused, inline):</span>
-<span class="k">def</span> <span class="nf">_pjit_ivjp</span><span class="p">(</span><span class="n">primals_in</span><span class="p">,</span> <span class="n">primals_out</span><span class="p">,</span> <span class="n">tangents_in</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
-  <span class="kn">import</span> <span class="nn">pdb</span><span class="p">;</span> <span class="n">pdb</span><span class="o">.</span><span class="n">set_trace</span><span class="p">()</span>
-  <span class="n">is_nz_tangents_in</span> <span class="o">=</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">ad</span><span class="o">.</span><span class="n">Zero</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tangents_in</span><span class="p">]</span>
-  <span class="c1">#jaxpr_ivjp, is_nz_tangents_out = ivjp_jaxpr(</span>
-  <span class="c1">#    jaxpr, is_nz_tangents_in, instantiate=False)</span>
-  <span class="n">jaxpr_ivjp</span><span class="p">,</span> <span class="n">is_nz_tangents_out</span> <span class="o">=</span> <span class="n">ivjp_jaxpr</span><span class="p">(</span>
-      <span class="n">jaxpr</span><span class="p">,</span> <span class="n">is_nz_tangents_in</span><span class="p">,</span> <span class="n">instantiate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="sd">@weakref_lru_cache</span>
+<span class="sd">def _ivjp_jaxpr(jaxpr, nonzeros, instantiate):</span>
+<span class="sd">  assert len(jaxpr.in_avals) == len(nonzeros)</span>
+<span class="sd">  f = lu.wrap_init(core.jaxpr_as_fun(jaxpr))</span>
+<span class="sd">  f_ivjp, out_nonzeros = f_ivjp_traceable(ivjp(f, instantiate=instantiate, transform_stack=False),</span>
+<span class="sd">                                          nonzeros)</span>
+<span class="sd">  tangent_avals = [aval for aval, nz in zip(jaxpr.in_avals, nonzeros) if nz]</span>
+<span class="sd">  avals_in = list(it.chain(jaxpr.in_avals, tangent_avals))</span>
+<span class="sd">  jaxpr_out, avals_out, literals_out = pe.trace_to_jaxpr_dynamic(f_ivjp, avals_in)</span>
+<span class="sd">  return core.ClosedJaxpr(jaxpr_out, literals_out), out_nonzeros()</span>
 
-  <span class="k">def</span> <span class="nf">_filter_zeros</span><span class="p">(</span><span class="n">is_nz_l</span><span class="p">,</span> <span class="n">l</span><span class="p">):</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">x</span> <span class="k">for</span> <span class="n">nz</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">is_nz_l</span><span class="p">,</span> <span class="n">l</span><span class="p">)</span> <span class="k">if</span> <span class="n">nz</span><span class="p">)</span>
-  <span class="n">_filter_zeros_in</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_filter_zeros</span><span class="p">,</span> <span class="n">is_nz_tangents_in</span><span class="p">)</span>
-  <span class="n">_filter_zeros_out</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_filter_zeros</span><span class="p">,</span> <span class="n">is_nz_tangents_out</span><span class="p">)</span>
-  <span class="n">outputs</span> <span class="o">=</span> <span class="n">pjit_p</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span>
-      <span class="o">*</span><span class="n">primals_in</span><span class="p">,</span> <span class="o">*</span><span class="n">_filter_zeros_in</span><span class="p">(</span><span class="n">tangents_in</span><span class="p">),</span>
-      <span class="n">jaxpr</span><span class="o">=</span><span class="n">jaxpr_ivjp</span><span class="p">)</span>
-<span class="w">  </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">#def _pjit_ivjp(primals_in, tangents_in, jaxpr, in_shardings, out_shardings,</span>
+<span class="sd">#               resource_env, donated_invars, name, keep_unused, inline):</span>
+<span class="sd">def _pjit_ivjp(primals_in, primals_out, tangents_in, **params):</span>
+<span class="sd">  is_nz_tangents_in = [type(t) is not ad.Zero for t in tangents_in]</span>
+<span class="sd">  #jaxpr_ivjp, is_nz_tangents_out = ivjp_jaxpr(</span>
+<span class="sd">  #    jaxpr, is_nz_tangents_in, instantiate=False)</span>
+<span class="sd">  jaxpr_ivjp, is_nz_tangents_out = ivjp_jaxpr(</span>
+<span class="sd">      jaxpr, is_nz_tangents_in, instantiate=False)</span>
+
+<span class="sd">  def _filter_zeros(is_nz_l, l):</span>
+<span class="sd">    return (x for nz, x in zip(is_nz_l, l) if nz)</span>
+<span class="sd">  _filter_zeros_in = partial(_filter_zeros, is_nz_tangents_in)</span>
+<span class="sd">  _filter_zeros_out = partial(_filter_zeros, is_nz_tangents_out)</span>
+<span class="sd">  outputs = pjit_p.bind(</span>
+<span class="sd">      *primals_in, *_filter_zeros_in(tangents_in),</span>
+<span class="sd">      jaxpr=jaxpr_ivjp,</span>
 <span class="sd">      in_shardings=(*in_shardings, *_filter_zeros_in(in_shardings)),</span>
 <span class="sd">      out_shardings=(*out_shardings, *_filter_zeros_out(out_shardings)),</span>
 <span class="sd">      resource_env=resource_env,</span>
@@ -477,27 +486,27 @@
 <span class="sd">      name=name,</span>
 <span class="sd">      keep_unused=keep_unused,</span>
 <span class="sd">      inline=inline)</span>
-<span class="sd">  &quot;&quot;&quot;</span>
 
-  <span class="n">primals_out</span><span class="p">,</span> <span class="n">tangents_out</span> <span class="o">=</span> <span class="n">split_list</span><span class="p">(</span><span class="n">outputs</span><span class="p">,</span> <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">outvars</span><span class="p">)])</span>
-  <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">primals_out</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">jaxpr</span><span class="o">.</span><span class="n">outvars</span><span class="p">)</span>
-  <span class="n">tangents_out_it</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">tangents_out</span><span class="p">)</span>
-  <span class="k">return</span> <span class="n">primals_out</span><span class="p">,</span> <span class="p">[</span><span class="nb">next</span><span class="p">(</span><span class="n">tangents_out_it</span><span class="p">)</span> <span class="k">if</span> <span class="n">nz</span> <span class="k">else</span> <span class="n">ad</span><span class="o">.</span><span class="n">Zero</span><span class="p">(</span><span class="n">aval</span><span class="p">)</span>
-                       <span class="k">for</span> <span class="n">nz</span><span class="p">,</span> <span class="n">aval</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">is_nz_tangents_out</span><span class="p">,</span> <span class="n">jaxpr</span><span class="o">.</span><span class="n">out_avals</span><span class="p">)]</span>
+<span class="sd">  primals_out, tangents_out = split_list(outputs, [len(jaxpr.jaxpr.outvars)])</span>
+<span class="sd">  assert len(primals_out) == len(jaxpr.jaxpr.outvars)</span>
+<span class="sd">  tangents_out_it = iter(tangents_out)</span>
+<span class="sd">  return primals_out, [next(tangents_out_it) if nz else ad.Zero(aval)</span>
+<span class="sd">                       for nz, aval in zip(is_nz_tangents_out, jaxpr.out_avals)]</span>
 
-<span class="c1">#primitive_ivjps[pjit_p] = _pjit_ivjp</span>
+<span class="sd">#primitive_ivjps[pjit_p] = _pjit_ivjp</span>
 
-<span class="nd">@lu</span><span class="o">.</span><span class="n">transformation_with_aux</span>
-<span class="k">def</span> <span class="nf">f_ivjp_traceable</span><span class="p">(</span><span class="n">nonzeros</span><span class="p">,</span> <span class="o">*</span><span class="n">primals_and_nztangents</span><span class="p">):</span>
-  <span class="n">num_primals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nonzeros</span><span class="p">)</span>
-  <span class="n">primals</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">primals_and_nztangents</span><span class="p">[:</span><span class="n">num_primals</span><span class="p">])</span>
-  <span class="n">nonzero_tangents</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">primals_and_nztangents</span><span class="p">[</span><span class="n">num_primals</span><span class="p">:])</span>
-  <span class="n">tangents</span> <span class="o">=</span> <span class="p">[</span><span class="nb">next</span><span class="p">(</span><span class="n">nonzero_tangents</span><span class="p">)</span> <span class="k">if</span> <span class="n">nz</span> <span class="k">else</span> <span class="n">Zero</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
-              <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">nz</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">primals</span><span class="p">,</span> <span class="n">nonzeros</span><span class="p">)]</span>
-  <span class="n">primals_out</span><span class="p">,</span> <span class="n">tangents_out</span> <span class="o">=</span> <span class="k">yield</span> <span class="p">(</span><span class="n">primals</span><span class="p">,</span> <span class="n">tangents</span><span class="p">),</span> <span class="p">{}</span>
-  <span class="n">out_nonzeros</span> <span class="o">=</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Zero</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tangents_out</span><span class="p">]</span>
-  <span class="n">nonzero_tangents_out</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tangents_out</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Zero</span><span class="p">]</span>
-  <span class="k">yield</span> <span class="nb">list</span><span class="p">(</span><span class="n">primals_out</span><span class="p">)</span> <span class="o">+</span> <span class="n">nonzero_tangents_out</span><span class="p">,</span> <span class="n">out_nonzeros</span>
+<span class="sd">@lu.transformation_with_aux</span>
+<span class="sd">def f_ivjp_traceable(nonzeros, *primals_and_nztangents):</span>
+<span class="sd">  num_primals = len(nonzeros)</span>
+<span class="sd">  primals = list(primals_and_nztangents[:num_primals])</span>
+<span class="sd">  nonzero_tangents = iter(primals_and_nztangents[num_primals:])</span>
+<span class="sd">  tangents = [next(nonzero_tangents) if nz else Zero.from_value(p)</span>
+<span class="sd">              for p, nz in zip(primals, nonzeros)]</span>
+<span class="sd">  primals_out, tangents_out = yield (primals, tangents), {}</span>
+<span class="sd">  out_nonzeros = [type(t) is not Zero for t in tangents_out]</span>
+<span class="sd">  nonzero_tangents_out = [t for t in tangents_out if type(t) is not Zero]</span>
+<span class="sd">  yield list(primals_out) + nonzero_tangents_out, out_nonzeros</span>
+<span class="sd">&quot;&quot;&quot;</span>
 </pre></div>
 
            </div>
