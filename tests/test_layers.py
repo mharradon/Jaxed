@@ -59,6 +59,47 @@ class LayerTests(jtu.JaxTestCase):
                         jax.jit(v_and_g)(x),
                         check_dtypes=True)
 
+  def test_real_net(self):
+    blocks = []
+    N = 64
+    normal_ad_block_limit = None
+    rev_ad_block_limit = None
+    blocks = []
+    blocks_ref = []
+    xs = (np.ones((N, N, N, N), dtype='float32'),
+          np.ones((N, N, N, N), dtype='float32'))
+    for _ in range(4):
+      blocks.append(RevNetBlock(DenseWithAct(N),
+                                DenseWithAct(N)))
+      blocks_ref.append(_RevNetBlockRef(DenseWithAct(N),
+                                        DenseWithAct(N)))
+
+    net = nn.Sequential(blocks)
+    net_inv = Invertible(net)
+    net_ref = nn.Sequential(blocks_ref)
+    params_key = jax.random.key(0)
+
+    @jax.jit
+    def v_and_g(params, x):
+      def fwd(p, x):
+        out = net.apply(p, *x)
+        return jnp.sum(out[0] + out[1])
+      return jax.value_and_grad(fwd, argnums=(0,))(params, x)
+
+    @jax.jit
+    def v_and_g_inv(params, x):
+      def fwd(p, x):
+        out = net_inv.apply(p, *x)
+        return jnp.sum(out[0] + out[1])
+      return jax.value_and_grad(fwd, argnums=(0,))(params, x)
+
+    params = net.init(params_key, *xs)
+    params_inv = net_inv.init(params_key, *xs)
+    params_ref = net_ref.init(params_key, *xs)
+
+    v_and_g(params, xs)
+    v_and_g_inv(params_inv, xs)
+
   @jtu.skip_on_devices("cpu")
   def test_perf(self):
     blocks = []
@@ -97,20 +138,6 @@ class LayerTests(jtu.JaxTestCase):
           out = net_inv.apply(p, *x)
           return jnp.sum(out[0] + out[1])
         return jax.value_and_grad(fwd, argnums=(0,))(params, x)
-
-      """
-      @jax.jit
-      def v_and_g_inv(params, x):
-        @jax.invertible
-        def basefwd(p, x):
-          return net.apply(p, *x)
-
-        def fwd(p, x):
-          out = basefwd(p, x)
-          return jnp.sum(out[0] + out[1])
-
-        return jax.value_and_grad(fwd, argnums=(0,))(params, x)
-      """
 
       #print(v_and_g(params))
       #print(v_and_g_inv(params))
@@ -165,7 +192,8 @@ class DenseWithAct(nn.Module):
   @nn.compact
   def __call__(self, x):
     x = nn.Dense(self.n)(x)
-    x = nn.activation.relu(x)
+    x = jax.invertible(jax.nn.selu)(x)
+    #x = jax.nn.selu(x)
     return x
 
 if __name__ == "__main__":
