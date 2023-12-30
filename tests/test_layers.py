@@ -75,7 +75,6 @@ class LayerTests(jtu.JaxTestCase):
                                         DenseWithAct(N)))
 
     net = nn.Sequential(blocks)
-    net_inv = Invertible(net)
     net_ref = nn.Sequential(blocks_ref)
     params_key = jax.random.key(0)
 
@@ -86,19 +85,41 @@ class LayerTests(jtu.JaxTestCase):
         return jnp.sum(out[0] + out[1])
       return jax.value_and_grad(fwd, argnums=(0,))(params, x)
 
-    @jax.jit
-    def v_and_g_inv(params, x):
-      def fwd(p, x):
-        out = net_inv.apply(p, *x)
-        return jnp.sum(out[0] + out[1])
-      return jax.value_and_grad(fwd, argnums=(0,))(params, x)
-
     params = net.init(params_key, *xs)
-    params_inv = net_inv.init(params_key, *xs)
     params_ref = net_ref.init(params_key, *xs)
 
     v_and_g(params, xs)
-    v_and_g_inv(params_inv, xs)
+
+  def test_drop_net(self):
+    blocks = []
+    N = 64
+    normal_ad_block_limit = None
+    rev_ad_block_limit = None
+    blocks = []
+    blocks_ref = []
+    xs = (np.ones((N, N, N, N), dtype='float32'),
+          np.ones((N, N, N, N), dtype='float32'))
+    for _ in range(4):
+      blocks.append(RevNetBlock(DenseWithDrop(N),
+                                DenseWithDrop(N)))
+      blocks_ref.append(_RevNetBlockRef(DenseWithDrop(N),
+                                        DenseWithDrop(N)))
+
+    net = SequentialAux(blocks, 2)
+    net_ref = SequentialAux(blocks_ref, 2)
+    params_key = jax.random.key(0)
+
+    @jax.jit
+    def v_and_g(params, x):
+      def fwd(p, x):
+        out = net.apply(p, *x, (True,), (True,), rngs={'dropout': jax.random.key(0)})
+        return jnp.sum(out[0] + out[1])
+      return jax.value_and_grad(fwd, argnums=(0,))(params, x)
+
+    params = net.init(params_key, *xs, (False,), (False,))
+    params_ref = net_ref.init(params_key, *xs, (False,), (False,))
+
+    v_and_g(params, xs)
 
   @jtu.skip_on_devices("cpu")
   def test_perf(self):
@@ -121,7 +142,6 @@ class LayerTests(jtu.JaxTestCase):
       num_blocks = len(blocks)
 
       net = nn.Sequential(blocks)
-      net_inv = Invertible(net)
       net_ref = nn.Sequential(blocks_ref)
       params_key = jax.random.key(0)
 
@@ -133,30 +153,26 @@ class LayerTests(jtu.JaxTestCase):
         return jax.value_and_grad(fwd, argnums=(0,))(params, x)
 
       @jax.jit
-      def v_and_g_inv(params, x):
+      def v_and_g_ref(params, x):
         def fwd(p, x):
-          out = net_inv.apply(p, *x)
+          out = net_ref.apply(p, *x)
           return jnp.sum(out[0] + out[1])
         return jax.value_and_grad(fwd, argnums=(0,))(params, x)
-
-      #print(v_and_g(params))
-      #print(v_and_g_inv(params))
 
       print(f"{num_blocks} Blocks:")
 
       params = net.init(params_key, *xs)
-      params_inv = net_inv.init(params_key, *xs)
       params_ref = net_ref.init(params_key, *xs)
       if normal_ad_block_limit is None:
         try:
-          print(f"Normal AD: {timefunc(v_and_g, params, xs, N=5)} s")
+          print(f"Normal AD: {timefunc(v_and_g_ref, params_ref, xs, N=5)} s")
         except XlaRuntimeError as E:
           sleep(3) # Print after OOM spew
           print(f"Normal AD OOMd at {num_blocks} blocks! {E}")
           normal_ad_block_limit = num_blocks
 
       try:
-        print(f"Reversible AD: {timefunc(v_and_g_inv, params_inv, xs, N=5)} s")
+        print(f"Reversible AD: {timefunc(v_and_g, params, xs, N=5)} s")
       except XlaRuntimeError as E:
         sleep(3) # Print after OOM spew
         print(f"Reversible AD OOMd at {num_blocks} blocks! {E}")
@@ -195,6 +211,30 @@ class DenseWithAct(nn.Module):
     x = jax.invertible(jax.nn.selu)(x)
     #x = jax.nn.selu(x)
     return x
+
+class DenseWithDrop(nn.Module):
+  n: int
+  @nn.compact
+  def __call__(self, x, training):
+    x = nn.Dense(self.n)(x)
+    x = nn.Dropout(0.2)(x, deterministic=not training)
+    x = jax.invertible(jax.nn.selu)(x)
+    #x = jax.nn.selu(x)
+    return x
+
+class SequentialAux(nn.Module):
+  blocks: list
+  num_aux_args: int
+  @nn.compact
+  def __call__(self, *args):
+    args, aux = args[:-self.num_aux_args], args[-self.num_aux_args:]
+    for block in self.blocks:
+      if not isinstance(args, tuple):
+        args = (args,)
+      args = block(*args, *aux)
+
+    return args
+
 
 if __name__ == "__main__":
   absltest.main(testLoader=jtu.JaxTestLoader())
