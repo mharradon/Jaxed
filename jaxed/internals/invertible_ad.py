@@ -22,7 +22,7 @@ from jax import core
 from jax.extend import linear_util as lu
 from jax.interpreters import ad
 from jax.interpreters import partial_eval as pe
-from jax.core import raise_to_shaped, get_aval, Literal, Jaxpr
+from jax.core import raise_to_shaped, get_aval, Literal, Jaxpr, CallPrimitive
 from jax._src.api_util import flatten_fun_nokwargs
 from jax.tree_util import tree_flatten, tree_unflatten, register_pytree_node
 from jax._src.util import safe_map, safe_zip, split_list, weakref_lru_cache
@@ -63,7 +63,9 @@ def invertible(fun):
     #jaxpr, out_pvals, consts = pe.trace_to_jaxpr_nounits(fun_flat, in_pvals)
 
     in_avals = tuple(get_aval(arg) for arg in flat_args)
+
     jaxpr, out_avals, consts = pe.trace_to_jaxpr_dynamic(fun_flat, in_avals)
+
     # TODO: Don't warn if consts contain JVP tracers?
     if consts:
       warnings.warn("Values that an @invertible function closes over will not have their " +
@@ -211,7 +213,7 @@ def inv_backward_pass(jaxpr: core.Jaxpr, consts, primals_in, primals_out, cotang
       ivjp_jaxpr = eqn.params['ivjp_jaxpr']
     else:
       if eqn.primitive in primitive_ivjps:
-        complete_ivjp = lu.wrap_init(primitive_ivjps[eqn.primitive])
+        complete_ivjp = lu.wrap_init(partial(primitive_ivjps[eqn.primitive], **eqn.params))
       else:
         complete_ivjp = lu.wrap_init(partial(synthesize_ivjp, eqn, map(ad.is_undefined_primal, primals_in)))
       _, in_tree = tree_flatten(
@@ -220,10 +222,11 @@ def inv_backward_pass(jaxpr: core.Jaxpr, consts, primals_in, primals_out, cotang
 
       in_avals = map(abstract, primals_in + primals_out + primals_out)
       # TODO: Actually we do know some of the inputs, because they might be literals!
-      ivjp_jaxpr, out_pvals, _ = pe.trace_to_jaxpr_nounits(
-          complete_ivjp_flat, map(pe.PartialVal.unknown, in_avals), instantiate=True)
-      #ivjp_jaxpr, out_pvals, _ = pe.trace_to_jaxpr_dynamic(
-      #    complete_ivjp_flat, in_avals)
+      #ivjp_jaxpr, out_pvals, _ = pe.trace_to_jaxpr_nounits(
+      #    complete_ivjp_flat, map(pe.PartialVal.unknown, in_avals), instantiate=True)
+
+      ivjp_jaxpr, out_pvals, _ = pe.trace_to_jaxpr_dynamic(
+          complete_ivjp_flat, in_avals)
       assert not ivjp_jaxpr.constvars  # That might happen some time, but don't bother until then
       ivjp_jaxpr = core.ClosedJaxpr(ivjp_jaxpr, [])
 
@@ -339,10 +342,10 @@ def _custom_ivjp_call_mlir_translation(ctx, *args, fun_jaxpr, ivjp_jaxpr):
 
 mlir.register_lowering(custom_ivjp_p, _custom_ivjp_call_mlir_translation)
 
-"""
 ################################################################################
 # PJIT Stuff
 ################################################################################
+
 def ivjp_jaxpr(jaxpr: core.ClosedJaxpr, nonzeros: Sequence[bool],
                instantiate: Union[bool, Sequence[bool]]) -> tuple[core.ClosedJaxpr, list[bool]]:
   if type(instantiate) is bool:
@@ -360,12 +363,9 @@ def _ivjp_jaxpr(jaxpr, nonzeros, instantiate):
   jaxpr_out, avals_out, literals_out = pe.trace_to_jaxpr_dynamic(f_ivjp, avals_in)
   return core.ClosedJaxpr(jaxpr_out, literals_out), out_nonzeros()
 
-#def _pjit_ivjp(primals_in, tangents_in, jaxpr, in_shardings, out_shardings,
-#               resource_env, donated_invars, name, keep_unused, inline):
-def _pjit_ivjp(primals_in, primals_out, tangents_in, **params):
+def _pjit_ivjp(primals_in, primals_out, tangents_in, jaxpr, in_shardings, out_shardings,
+               resource_env, donated_invars, name, keep_unused, inline):
   is_nz_tangents_in = [type(t) is not ad.Zero for t in tangents_in]
-  #jaxpr_ivjp, is_nz_tangents_out = ivjp_jaxpr(
-  #    jaxpr, is_nz_tangents_in, instantiate=False)
   jaxpr_ivjp, is_nz_tangents_out = ivjp_jaxpr(
       jaxpr, is_nz_tangents_in, instantiate=False)
 
@@ -403,4 +403,3 @@ def f_ivjp_traceable(nonzeros, *primals_and_nztangents):
   out_nonzeros = [type(t) is not Zero for t in tangents_out]
   nonzero_tangents_out = [t for t in tangents_out if type(t) is not Zero]
   yield list(primals_out) + nonzero_tangents_out, out_nonzeros
-"""
